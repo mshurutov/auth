@@ -1,0 +1,77 @@
+ldap_templates_dir: "{{ role_path }}/templates"
+ldap_files_dir: "{{ role_path }}/files"
+ldap_system_user: "ldap"
+ldap_system_group: "ldap"
+slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
+ldap_config_dir: "/etc/openldap"
+ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
+ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
+ldap_ssl_dir: "{{ ldap_config_dir }}/ssl"
+ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ common_domain_name }}-private.key"
+ldap_ssl_csr: "{{ ldap_ssl_dir }}/{{ common_domain_name }}.csr"
+ldap_ssl_cert: "{{ ldap_ssl_dir }}/{{ common_domain_name }}.crt"
+ldap_tmp_ldif: "/var/tmp/ldap"
+ldap_module_path: "/usr/lib64/openldap/openldap"
+ldap_admin_path: "/usr/loca/sbin"
+ldap_port: 389
+ldap_ssl_port: 686
+ldap_slapd_urls_regexp: "^Environment=.*"
+ldap_slapd_urls: 'Environment="SLAPD_URLS=ldaps:/// ldapi:///"'
+ldap_default_modules:
+  - "back_mdb.so"
+ldap_default_schemas:
+  - "core"
+  - "cosine"
+  - "inetorgperson"
+ldap_schema_only:
+  - "kerberos"
+  - "rfc2307bis"
+  - "samba"
+  - "sudo"
+ldap_loglevel: "stats stats2"
+ldap_config_db_type: "mdb"
+ldap_db_directory: "/var/lib/openldap-data"
+ldap_db_config_max_size: 1073741824 
+ldap_base_name: "mycompany"
+ldap_organization_name: "Example Company"
+ldap_organization_desc: "Mycompany company"
+ldap_base_suffix: "dc=mycompany,dc=local"
+ldap_rootdn: "cn=ldap_owner,{{ ldap_base_suffix }}"
+ldap_root_password: "zaq123wsx"
+ldap_server_uri: "ldapi:///"
+ldap_conf_params:
+  BASE: "{{ ldap_base_suffix }}"
+  URI: "ldap://{{ ansible_hostname }}"
+ldap_user_conf_params:
+  BINDDN: "{{ ldap_reader_dn }}"
+  BINDPW: "base64:{{ ldap_reader_password | string | b64encode }}"
+ldap_ops_group: "cn=ops,ou=groups,{{ ldap_base_suffix }}"
+ldap_bs_acl:
+  - '{0}to attrs=userPassword
+    by self write 
+    by anonymous auth
+    by group.exact="{{ ldap_ops_group }}" write
+    by * none'
+  - '{1}to *
+    by self write
+    by group.exact="{{ ldap_ops_group }}" write
+    by users read
+    by * none'
+ldap_default_ous:
+  - ou: "users"
+    dn: "ou=users,{{ ldap_base_suffix }}"
+    description: "Users of {{ ldap_organization_name }}"
+  - ou: "groups"
+    dn: "ou=groups,{{ ldap_base_suffix }}"
+    description: "Groups of {{ ldap_organization_name }}"
+ldap_loginshell: '/bin/bash'
+ldap_home_root: '/home'
+ldap_users_ou: "ou=users,{{ ldap_base_suffix }}"
+ldap_groups_ou: "ou=groups,{{ ldap_base_suffix }}"
+ldap_reader_dn: "uid=reader,{{ ldap_users_ou }}"
+ldap_reader_password: "ldap_reader_pwd"
+ldap_memberof_group_oc: "groupOfNames"
+ldap_memberof_member_ad: "member"
+ldap_memberof_memberof_ad: "memberOf"
+ldap_memberof_refint: "FALSE"
+

@@ -1,0 +1,48 @@
+---
+
+- name: install ldap service
+  ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
+  tags: ldap_install
+
+- name: setup server
+  ansible.builtin.import_tasks: ldap_server.yml
+  when: ldap_init is defined and ldap_init | bool
+  tags: ldap_server_config
+
+- name: check if local CA is exist on target host
+  ansible.builtin.stat:
+    path: "{{ common_ssl_CA }}"
+  register: stat_ssl_ca
+  tags: ldap_ssl
+
+- name: copy root CA to target host
+  ansible.builtin.copy:
+    src: "{{ common_local_store }}//{{ common_domain_name }}-ssl-ca.pem"
+    dest: "{{ common_ssl_CA }}"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  when: ! stat_ssl_ca.stat.stat.exists
+  tags: ldap_ssl
+
+- name: edit {{ ldap_config_dir }}/ldap.conf (system config)
+  ansible.builtin.lineinfile:
+    path:  "{{ ldap_config_dir }}/ldap.conf"
+    regexp: "^[\t ]*#?[\t ]*{{ item.key }}.*"
+    line: "{{ item.key }} {{ item.value }}"
+    state: present
+  loop: "{{  lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
+  tags: ldap_client_config
+
+- name: edit /etc/ldap.conf (any services and users config)
+  ansible.builtin.lineinfile:
+    path:  "/etc/ldap.conf"
+    line: "{{ item.key }} {{ item.value }}"
+    state: present
+    owner: 'root'
+    group: 'root'
+    mode: '0600'
+    create: true
+  loop: "{{ ldap_conf_params | ansible.builtin.combine(ldap_user_conf_params) | dict2items }}"
+  tags: ldap_client_config
+

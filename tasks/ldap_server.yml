@@ -1,0 +1,428 @@
+---
+
+### Init ldap service ###
+## Process of init is: stop slapd if started; delete config and db dirs;
+## copy schemas *.ldif into server; create tmpdir; copy template of init.ldif to created dir
+## create config and db dirs; init ldap service by exec command slapadd
+- name: init openldap service 
+  block:
+## Stop slapd service
+    - name: check if slapd stopped
+      ansible.builtin.service:
+        name: slapd
+        state: stopped
+      tags: ldap_init,slapd_stop
+## Remove config and data DB dirs
+    - name: delete config and data DB dirs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ ldap_config_db_dir }}"
+        - "{{ ldap_db_directory }}"
+      tags: ldap_init,slapd_stop
+## Copy *.ldif to target host, because this files are not exist
+    - name: copy any *.ldif to {{ ldap_config_schema_dir }} directory on target host
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ ldap_config_schema_dir }}/"
+      loop: "{{ lookup('ansible.builtin.fileglob', ldap_files_dir + '/*.ldif', wantlist=True) }}"
+      tags: ldap_init
+## Create temp dir
+    - name: check if /tmp/openldap/ exists on target host
+      ansible.builtin.file:
+        path: /tmp/openldap
+        state: directory
+      tags: ldap_init
+## Copy initial ldif
+    - name: copy templates to target host
+      ansible.builtin.template:
+        src: "{{ ldap_templates_dir }}/init.ldif.j2"
+        dest: /tmp/openldap/init.ldif
+      tags: ldap_init
+## Create config and data DB dirs
+    - name: check if openldap DB dir exists
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: "0700"
+        owner: "{{ ldap_system_user }}"
+        group: "{{ ldap_system_group }}"
+        state: directory
+      loop:
+        - "{{ ldap_db_directory }}"
+        - "{{ ldap_config_db_dir }}"
+      tags: ldap_init
+## Init ldap service
+    - name: init ldap instance
+      become: yes
+      become_user: root
+      ansible.builtin.command: "slapadd -n 0 -F {{ ldap_config_db_dir }} -l /tmp/openldap/init.ldif"
+      tags: ldap_init
+## Clean init data after init
+    - name: remove init.ldif
+      ansible.builtin.file:
+        path: /tmp/openldap
+        state: absent
+      tags: ldap_init
+## set owner of config dir
+    - name: set configure directory owner and group
+      ansible.builtin.file:
+        path: "{{ ldap_config_dir }}"
+        owner: "{{ ldap_system_user }}"
+        group: "{{ ldap_system_group }}"
+        recurse: yes
+        state: directory
+      tags: ldap_init
+  when: ldap_init_force is defined and ldap_init_force | bool
+
+- name: copy schema2ldif.sh to target host
+  ansible.builtin.copy:
+    src: "{{ ldap_files_dir }}/schema2ldif.sh"
+    dest: "{{ ldap_admin_path }}/"
+    owner: 'root'
+    group: 'root'
+    mode: 0755
+  tags: ldap_setup,ldap_schema_ldif
+
+- name: check if {{ ldap_tmp_ldif }} exists
+  ansible.builtin.file:
+    path: "{{ ldap_tmp_ldif }}"
+    state: 'directory'
+  tags: ldap_setup,ldap_schema_ldif
+
+- name: convert schema files to ldif
+  become: yes
+  become_user: root
+  ansible.builtin.command:
+    chdir: "{{ ldap_config_schema_dir }}"
+    argv:
+      - "{{ ldap_admin_path }}/schema2ldif.sh"
+      - "{{ item }}.schema"
+      - "{{ ldap_config_schema_dir }}/core.schema"
+      - "{{ ldap_config_schema_dir }}/cosine.schema"
+      - "{{ ldap_config_schema_dir }}/inetorgperson.schema"
+  loop: "{{ ldap_schema_only }}"
+  tags: ldap_setup,ldap_schema_ldif
+
+# All follow tasks need slapd is started
+- name: start openldap service
+  ansible.builtin.service:
+    name: slapd
+    state: started
+  notify:
+    - enable slapd
+  tags: ldap_setup,ldap_start
+
+- name: Load any additional modules
+  block:
+    - name: get list of loaded modules
+      ansible.builtin.shell: |
+        ldapsearch -Y EXTERNAL -H ldapi:/// -b 'cn=module{0},cn=config' 2>/dev/null \
+        | grep olcModuleLoad \
+        | perl -MMIME::Base64 -n -00 -e 's/\n +//g;s/(?<=:: )(\S+)/decode_base64($1)/eg;print' \
+        | awk '{ gsub(/\{[0-9]+\}/,"",$2); print $2 }'
+      register: loaded_modules
+      check_mode: no
+      tags: ldap_setup,ldap_setup_add_modules
+    - name: add additional modules
+      community.general.ldap_attrs:
+        dn: cn=module{0},cn=config
+        attributes:
+          olcModuleload: "{{ item }}"
+      loop: "{{ ldap_ext_modules  }}"
+      tags: ldap_setup,ldap_setup_add_modules
+      when: not item in loaded_modules.stdout
+  when: ldap_ext_modules is defined
+
+- name: Load any additional schemas
+  block:
+    - name: get list of loaded schemas
+      ansible.builtin.shell: |
+        ldapsearch -Y EXTERNAL -H ldapi:/// -b 'cn=schema,cn=config' 2>/dev/null \
+        | awk '/^dn:.*,cn=schema,cn=config/ { s = gensub(/dn: cn={[0-9]+}([^, ]+),cn=schema,cn=config/,"\\1","g"); print s}'
+      register: loaded_schemas
+      check_mode: no
+      tags: ldap_setup,ldap_setup_add_schemas
+    - name: load additional schemas
+      ansible.builtin.command: "ldapadd -Q -Y EXTERNAL -H ldapi:/// -f {{ ldap_config_schema_dir }}/{{ item }}.ldif"
+      loop: "{{ ldap_ext_schemas }}"
+      when: not item in loaded_schemas.stdout
+      tags: ldap_setup,ldap_setup_add_schemas
+  when: ldap_ext_schemas is defined
+
+- name: add Organization into LDAP
+  community.general.ldap_entry:
+    dn: "{{ ldap_base_suffix }}"
+    objectClass:
+      - dcObject
+      - organization
+    attributes:
+      o: "{{ ldap_organization_name }}"
+      dc: "{{ ldap_base_name }}"
+      description: "{{ ldap_organization_desc }}"
+  tags: ldap_setup,ldap_setup_o
+
+- name: add organizational units
+  community.general.ldap_entry:
+    dn: "{{ item.dn }}"
+    objectClass: OrganizationalUnit
+    attributes:
+      ou: "{{ item.ou }}"
+      description: "{{ item.description }}"
+  loop: "{{ [ldap_default_ous,ldap_ext_ous] | community.general.lists_mergeby('ou') }}"
+  tags: ldap_setup,ldap_setup_bs_ous
+
+- name: add overlays
+  ansible.builtin.include_tasks: "{{ item.key }}.yml"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_overlays, wantlist=True) }}"
+  when: ldap_overlays is defined
+  tags: ldap_setup,ldap_setup_overlays,ldap_setup_memberof,ldap_setup_ppolicy
+
+- name: add sudo over ldap support
+  block:
+    - name: add sudo entries to ldap
+      community.general.ldap_entry:
+        dn: "{{ item.value.dn }}"
+        objectClass:
+          - "{{ item.value.objectClass }}"
+        attributes:
+          cn: "{{ item.value.cn }}"
+          description: "{{ item.value.description | default(omit) }}"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_sudo, wantlist=True) }}"
+    - name: change sudoOption of sudo_ldap entries
+      community.general.ldap_attrs:
+        dn: "{{ item.0.value.dn }}"
+        attributes:
+          sudoOption: "{{ item.1 | default (omit) }}"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_sudo, wantlist=True) | subelements('value.sudoOption',skip_missing=True) }}"
+    - name: change attributes of sudo_ldap entries
+      community.general.ldap_attrs:
+        dn: "{{ item.value.dn }}"
+        attributes:
+          sudoUser: "{{ item.value.sudoUser | default(omit) }}"
+          sudoHost: "{{ item.value.sudoHost | default(omit) }}"
+          sudoCommand: "{{ item.value.sudoCommand | default(omit) }}"
+          sudoRunAsUser: "{{ item.value.sudoRunAsUser | default (omit) }}"
+          sudoRunAsGroup: "{{ item.value.sudoRunAsGroup | default (omit) }}"
+          sudoNotBefore: "{{ item.value.sudoNotBefore | default (omit) }}"
+          sudoNotAfter: "{{ item.value.sudoNotAfter | default (omit) }}"
+          sudoOrder: "{{ item.value.sudoOrder }}"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_sudo, wantlist=True) }}"
+  when: ldap_sudo is defined
+  tags: ldap_setup,ldap_setup_sudo
+      
+- name: add users to ldap
+  community.general.ldap_entry:
+    dn: "{{ item.value.dn }}"
+    objectClass:
+      - "posixAccount"
+      - "shadowAccount"
+      - "inetOrgPerson"
+    attributes:
+      cn: "{{ item.key }}"
+      sn: "{{ item.key }}"
+      uid: "{{ item.key }}"
+      uidNumber: "{{ item.value.uidNumber }}"
+      gidNumber: "{{ item.value.gidNumber }}"
+      homeDirectory: "{{ ldap_home_root }}/{{ item.key }}"
+      loginShell: "{{ item.value.loginShell | default(ldap_loginshell) }}"
+      mail: "{{ item.value.mail }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  tags: ldap_setup,ldap_users
+
+- name: add additional attributes for users
+  community.general.ldap_attrs:
+    dn: "{{ item.value.dn }}"
+    state: exact
+    attributes:
+      gecos: "{{ item.value.gecos | default(omit) }}"
+      description: "{{ item.value.description | default(omit) }}"
+      shadowLastChange: "{{ item.value.shadowLastChange | default(omit) }}"
+      shadowMin: "{{ item.value.shadowMin | default(omit) }}"
+      shadowMax: "{{ item.value.shadowMax | default(omit) }}"
+      shadowWarning: "{{ item.value.shadowWarning | default(omit) }}"
+      shadowInactive: "{{ item.value.shadowInactive | default(omit) }}"
+      shadowExpire: "{{ item.value.shadowExpire | default(omit) }}"
+      shadowFlag: "{{ item.value.shadowFlag | default(omit) }}"
+      audio: "{{ item.value.audio | default(omit) }}"
+      businessCategory: "{{ item.value.businessCategory | default(omit) }}"
+      carLicense: "{{ item.value.carLicense | default(omit) }}"
+      departmentNumber: "{{ item.value.departmentNumber | default(omit) }}"
+      displayName: "{{ item.value.displayName | default(omit) }}"
+      employeeNumber: "{{ item.value.employeeNumber | default(omit) }}"
+      employeeType: "{{ item.value.employeeType | default(omit) }}"
+      givenName: "{{ item.value.givenName | default(omit) }}"
+      homePhone: "{{ item.value.homePhone | default(omit) }}"
+      homePostalAddress: "{{ item.value.homePostalAddress | default(omit) }}"
+      initials: "{{ item.value.initials | default(omit) }}"
+      jpegPhoto: "{{ item.value.jpegPhoto | default(omit) }}"
+      labeledURI: "{{ item.value.labeledURI | default(omit) }}"
+      manager: "{{ item.value.manager | default(omit) }}"
+      organizationName: "{{ item.value.organizationName | default(omit) }}"
+      pager: "{{ item.value.pager | default(omit) }}"
+      roomNumber: "{{ item.value.roomNumber | default(omit) }}"
+      secretary: "{{ item.value.secretary | default(omit) }}"
+      userCertificate: "{{ item.value.userCertificate | default(omit) }}"
+      x500uniqueIdentifier: "{{ item.value.x500uniqueIdentifier | default(omit) }}"
+      preferredLanguage: "{{ item.value.preferredLanguage | default(omit) }}"
+      userSMIMECertificate: "{{ item.value.userSMIMECertificate | default(omit) }}"
+      userPKCS12: "{{ item.value.userPKCS12 | default(omit) }}"
+      seeAlso: "{{ item.value.seeAlso | default(omit) }}"
+      localityName: "{{ item.value.localityName | default(omit) }}"
+      organizationalUnitName: "{{ item.value.organizationalUnitName | default(omit) }}"
+      host: "{{ item.value.host | default(omit) }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  tags: ldap_setup,ldap_users
+
+- name: add password for every user
+  community.general.ldap_attrs:
+    dn: "{{ item.value.dn }}"
+    state: exact
+    attributes:
+      userPassword: "{{ item.value.userPassword | default(omit) }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  ignore_errors: true
+  tags: ldap_setup,ldap_users,ldap_users_pwd
+
+- name: add cn's for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      cn: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.cn') }}"
+  tags: ldap_setup,ldap_users,ldap_users_mail
+
+- name: add mails for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      mail: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mail',skip_missing=True) }}"
+  tags: ldap_setup,ldap_users,ldap_users_mail
+
+- name: add photo for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      photo:  "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.photo',skip_missing=True) }}"
+  tags: ldap_setup,ldap_users,ldap_users_photo
+
+- name: add mobile for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      mobile:  "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mobile',skip_missing=True) }}"
+  tags: ldap_setup,ldap_users,ldap_users_mobile
+
+- name: add ssh-keys support
+  block:
+    - name: add sshkeys objectclass for user
+      community.general.ldap_attrs:
+        dn: "{{ item.value.dn }}"
+        attributes:
+          objectClass: "ldapPublicKey"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+      tags: ldap_setup,ldap_users_sshkeys
+    - name: add sshkeys for user
+      community.general.ldap_attrs:
+        dn: "{{ item.0.value.dn }}"
+        attributes:
+         sshPublicKey: "{{ item.1 }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.sshPublicKey',skip_missing=True) }}"
+      tags: ldap_setup,ldap_users_sshkeys
+  when: ldap_sshkeys is defined and ldap_sshkeys | bool
+
+- name: add groups to ldap
+  community.general.ldap_entry:
+    dn: "{{ item.0.value.dn }}"
+    objectClass:
+      - "posixGroup"
+      - "groupOfNames"
+    attributes:
+      cn: "{{ item.0.value.primarycn }}"
+      member: "{{ item.1 }}"
+      gidNumber: "{{ item.0.value.gidNumber }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_groups, wantlist=True) | subelements('value.member') }}"
+  tags: ldap_setup,ldap_groups
+  
+- name: add members to groups
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      member: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_groups, wantlist=True) | subelements('value.member') }}"
+  tags: ldap_setup,ldap_groups
+
+- name: check if ssl dir is exist
+  file:
+    path: "{{ ldap_ssl_dir }}"
+    state: directory
+    owner: "{{ ldap_system_user }}"
+    group: "{{ ldap_system_group }}"
+    mode: 0755
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
+
+- name: create private key for LDAP SSL
+  community.crypto.openssl_privatekey:
+    path: "{{ ldap_ssl_pkey }}"
+    owner: "{{ ldap_system_user }}"
+    group: "{{ ldap_system_group }}"
+    mode: 0600
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
+
+- name: create Certificate Signing Request for LDAP SSL
+  community.crypto.openssl_csr:
+    path: "{{ ldap_ssl_csr }}"
+    privatekey_path: "{{ ldap_ssl_pkey }}"
+    country_name: "{{ common_country_name }}"
+    locality_name: "{{ common_ssl_locality_name | default(omit) }}"
+    common_name: "{{ common_hostname }}"
+    email_address: "{{ common_ssl_owner_email_address }}"
+    organization_name: "{{ common_ssl_organization_name | default(omit) }}"
+    organizational_unit_name: "ldap"
+    subject_alt_name: "{{ common_ssl_subject_alt_name | default(omit) }}"
+    owner: "{{ ldap_system_user }}"
+    group: "{{ ldap_system_group }}"
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
+
+- name: create certificate for LDAP SSL
+  community.crypto.x509_certificate:
+    path: "{{ ldap_ssl_cert }}"
+    privatekey_path: "{{ ldap_ssl_pkey }}"
+    csr_path: "{{ ldap_ssl_csr }}"
+    ownca_path: "{{ common_ssl_CA }}"
+    ownca_privatekey_path: "{{ common_ssl_CA_pkey }}"
+    provider: ownca
+    owner: "{{ ldap_system_user }}"
+    group: "{{ ldap_system_group }}"
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
+
+- name: add SSL support
+  community.general.ldap_attrs:
+    dn: "cn=config"
+    state: exact
+    attributes:
+      olcTLSVerifyClient: 'never'
+      olcTLSCertificateFile: "{{ ldap_ssl_cert }}"
+      olcTLSCertificateKeyFile: "{{ ldap_ssl_pkey }}"
+      olcTLSCACertificateFile: "{{ common_ssl_CA }}"
+  tags: ldap_setup,ldap_ssl,ldap_ssl_config
+
+- name: configure slapd for SSL network connection only
+  ansible.builtin.lineinfile:
+    path: "{{ slapd_service_file }}"
+    regexp: "{{ ldap_slapd_urls_regexp }}"
+    line: "{{ ldap_slapd_urls }}"
+    state: present
+  tags: ldap_setup,ldap_ssl,ldap_set_ssl_only
+
+- name: daemon reload after change unit
+  ansible.builtin.systemd:
+    name: slapd.service
+    daemon_reload: yes
+  notify: restart slapd
+  when: ansible_service_mgr == 'systemd'
+  tags: ldap_setup,ldap_ssl
+

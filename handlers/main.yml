@@ -1,0 +1,21 @@
+---
+
+- name: enable slapd
+  ansible.builtin.service:
+    name: slapd
+    enabled: yes
+
+- name: start slapd
+  ansible.builtin.service:
+    name: slapd
+    state: started
+
+- name: stop slapd
+  ansible.builtin.service:
+    name: slapd
+    state: stopped
+
+- name: restart slapd
+  ansible.builtin.service:
+    name: slapd
+    state: restarted

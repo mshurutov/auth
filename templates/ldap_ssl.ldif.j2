@@ -1,0 +1,12 @@
+dn: cn=config
+add: olcTLSVerifyClient
+olcTLSVerifyClient: never
+-
+add: olcTLSCertificateFile
+olcTLSCertificateFile: {{ ldap_ssl_cert }}
+-
+add: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: {{ ldap_ssl_pkey }}
+-
+add: olcTLSCACertificateFile
+olcTLSCACertificateFile: {{ common_ssl_CA }}
