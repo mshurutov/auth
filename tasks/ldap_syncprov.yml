@@ -1,0 +1,56 @@
+---
+
+- name: set short name for ldap_overlays.ldap_syncprov.overlay
+  ansible.builtin.set_fact:
+    lspo: "{{ ldap_overlays.ldap_syncprov.overlay }}"
+  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+
+- name: add entry of syncprov overlay into LDAP
+  community.general.ldap_entry:
+    dn: "{{ lspo.dn }}"
+    objectClass:
+      - "olcOverlayConfig"
+      - "olcSyncProvConfig"
+    attributes:
+      olcOverlay: "syncprov"
+      olcSpCheckPoint: "{{ lspo.attrs.olcSpCheckPoint }}"
+      olcSpNoPresent: "{{ lspo.attrs.olcSpNoPresent | default(false) }}"
+      olcSpReloadHint: "{{ lspo.attrs.olcSpReloadHint | default(false) }}"
+      olcSpSessionlog: "{{ lspo.attrs.olcSpSessionlog | default(omit) }}"
+  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+
+- name: add indexes for replication
+  community.general.ldap_attrs:
+    dn: "olcDatabase={{ ldap_config_db_type }},cn=config"
+    attributes:
+      olcDbIndex: "{{ item }}"
+    loop:
+      - "entryCSN eq"
+      - "entryUUID eq"
+  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+
+- name: add ServerID into cn=config
+  community.general.ldap_attrs:
+    dn: "cn=config"
+    attributes:
+      olcServerID: "{{ item.ServerID }} {{ item.ldap_uri }}"
+  loop: "{{ ldap_nodes }}"
+  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+
+- name: 
+  community.general.ldap_attrs:
+    dn: "olcDatabase={{ ldap_config_db_type }},cn=config"
+    attributes:
+      olcMirrorMode: TRUE
+      olcSyncrepl: >
+        rid=00{{ item.ServerID }}
+        provider={{ item.ldap_uri }}
+        bindmethod=simple 
+        binddn="{{ ldap_rootdn }}"
+        credentials="{{ ldap_root_password }}" 
+        searchbase="{{ ldap_base_suffix }}" 
+        type=refreshAndPersist 
+        timeout=0 
+        network-timeout=0 
+        retry="60 +" 
+  

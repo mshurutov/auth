@@ -74,4 +74,4 @@ ldap_memberof_group_oc: "groupOfNames"
 ldap_memberof_member_ad: "member"
 ldap_memberof_memberof_ad: "memberOf"
 ldap_memberof_refint: "FALSE"
-
+ldap_spcheckpoint: "5 60"

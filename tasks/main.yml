@@ -4,11 +4,6 @@
   ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
   tags: ldap_install
 
-- name: setup server
-  ansible.builtin.import_tasks: ldap_server.yml
-  when: ldap_init is defined and ldap_init | bool
-  tags: ldap_server_config
-
 - name: check if local CA is exist on target host
   ansible.builtin.stat:
     path: "{{ common_ssl_CA }}"
@@ -24,6 +19,11 @@
     mode: 0644
   when: ! stat_ssl_ca.stat.stat.exists
   tags: ldap_ssl
+
+- name: setup server
+  ansible.builtin.import_tasks: ldap_server.yml
+  when: ldap_is_server is defined and ldap_is_server | bool
+  tags: ldap_server_config
 
 - name: edit {{ ldap_config_dir }}/ldap.conf (system config)
   ansible.builtin.lineinfile:
