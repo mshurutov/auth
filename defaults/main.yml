@@ -30,6 +30,7 @@ ldap_schema_only:
   - "sudo"
 ldap_loglevel: "stats stats2"
 ldap_config_db_type: "mdb"
+ldap_db_data_number: 1
 ldap_db_directory: "/var/lib/openldap-data"
 ldap_db_config_max_size: 1073741824 
 ldap_base_name: "mycompany"
