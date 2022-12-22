@@ -6,7 +6,7 @@
     dn: "olcDatabase={-1}frontend,cn=config"
     attributes:
       olcPasswordHash: "{{ ldap_pass_enc_func }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
   
 - name: set password encryption format
   community.general.ldap_attrs:
@@ -15,23 +15,23 @@
       olcPasswordCryptSaltFormat: '$6$%.16s'
     state: 'exact' # without this line I get error "ldap.INAPPROPRIATE_MATCHING"
   when: ldap_pass_enc_func == '{CRYPT}'
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
 
 - name: set short name for ldap_overlays.ldap_ppolicy.overlay
   ansible.builtin.set_fact:
     lppo: "{{ ldap_overlays.ldap_ppolicy.overlay }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
 
 - name: set short name for ldap_overlays.ldap_ppolicy.policy
   ansible.builtin.set_fact:
     lppp: "{{ ldap_overlays.ldap_ppolicy.policy }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
 
 - name: search for ppolicy overlay in ldap
   ansible.builtin.command: 'ldapsearch -LLLQ -Y EXTERNAL -H ldapi:/// -b cn=config "olcOverlay=ppolicy"'
   register: lppo_exists
   check_mode: no
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
 
 - name: add entry of ppolicy overlay into LDAP
   community.general.ldap_entry:
@@ -46,7 +46,7 @@
       olcPPolicyUseLockout: "{{ lppo.attrs.olcPPolicyUseLockout | default(omit) }}"
       olcPPolicyForwardUpdates: "{{ lppo.attrs.olcPPolicyForwardUpdates | default(omit) }}"
   when: lppo_exists.stdout == ""
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
 
 - name: add entry of default password policy into ldap
   community.general.ldap_entry:
@@ -59,7 +59,8 @@
       cn: "ppolicy"
       sn: "ppolicy"
       pwdAttribute: "{{ lppp.attrs.pwdAttribute | default('userPassword') }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
+  when: common_hostname == common_primary_dc
 
 - name: add ppolicy attrs
   community.general.ldap_attrs:
@@ -80,5 +81,6 @@
       pwdAllowUserChange: "{{ lppp.attrs.pwdAllowUserChange | default(omit) }}"
       pwdSafeModify: "{{ lppp.attrs.pwdSafeModify | default(omit) }}"
       pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_ppolicy
+  tags: ldap_setup_ppolicy
+  when: common_hostname == common_primary_dc
       

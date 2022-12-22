@@ -1,16 +1,15 @@
 ldap_templates_dir: "{{ role_path }}/templates"
 ldap_files_dir: "{{ role_path }}/files"
+ldap_vars_dir: "{{ role_path }}/vars"
 ldap_system_user: "ldap"
 ldap_system_group: "ldap"
-slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
 ldap_config_dir: "/etc/openldap"
 ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
 ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
 ldap_ssl_dir: "{{ ldap_config_dir }}/ssl"
-ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ common_domain_name }}-private.key"
-ldap_ssl_csr: "{{ ldap_ssl_dir }}/{{ common_domain_name }}.csr"
-ldap_ssl_cert: "{{ ldap_ssl_dir }}/{{ common_domain_name }}.crt"
-ldap_tmp_ldif: "/var/tmp/ldap"
+ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name }}-private.key"
+ldap_ssl_csr: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name }}.csr"
+ldap_ssl_cert: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name }}.crt"
 ldap_module_path: "/usr/lib64/openldap/openldap"
 ldap_admin_path: "/usr/loca/sbin"
 ldap_port: 389
@@ -31,6 +30,7 @@ ldap_schema_only:
 ldap_loglevel: "stats stats2"
 ldap_config_db_type: "mdb"
 ldap_db_data_number: 1
+ldap_db_dn: "olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config"
 ldap_db_directory: "/var/lib/openldap-data"
 ldap_db_config_max_size: 1073741824 
 ldap_base_name: "mycompany"

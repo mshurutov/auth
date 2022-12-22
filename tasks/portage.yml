@@ -2,10 +2,9 @@
 
 - name: check if openldap is installed
   community.general.portage:
-    package:
-      - openldap
-      - python-ldap
+    package: "{{ ldap_packages }}"
     state: present
+  tags: ldap_install
 
 - name: configure daemon
   block:
@@ -21,4 +20,5 @@
         regexp: '^#?\s*(OPTS_CONF="-F /etc/.*/slapd.d")'
         line: '\1'
         backrefs: yes
+  tags: ldap_install
   when: ldap_is_server is defined and ldap_is_server | bool

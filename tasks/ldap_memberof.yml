@@ -3,7 +3,7 @@
 - name: set short name for ldap_overlays.ldap_memberof.overlay
   ansible.builtin.set_fact:
     lmo: "{{ ldap_overlays.ldap_memberof.overlay }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_memberof
+  tags: ldap_setup_memberof
 
 - name: add entry of memberof overlay into LDAP
   community.general.ldap_entry:
@@ -18,5 +18,5 @@
         olcMemberOfDangling: "{{ lmo.attrs.olcMemberOfDangling | default(omit) }}"
         olcMemberOfDanglingError: "{{ lmo.attrs.olcMemberOfDanglingError | default(omit) }}"
         olcMemberOfRefInt: "{{ lmo.attrs.olcMemberOfRefInt }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_memberof
+  tags: ldap_setup_memberof
 

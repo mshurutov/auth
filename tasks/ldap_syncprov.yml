@@ -3,7 +3,102 @@
 - name: set short name for ldap_overlays.ldap_syncprov.overlay
   ansible.builtin.set_fact:
     lspo: "{{ ldap_overlays.ldap_syncprov.overlay }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+
+### BEGIN: Copy DIT from {{ common_primary_dc }} to other hosts
+# get DIT into variable. There is on {{ common_primary_dc }}
+- name: get LDAP DIT from {{ common_primary_dc }}
+  ansible.builtin.shell: slapcat
+  register: ldap_DIT
+  check_mode: no
+  tags: ldap_setup_syncprov
+  when: common_hostname == common_primary_dc
+
+- name: copy ldap_DIT to controller as file
+  ansible.builtin.copy:
+    dest: "/tmp/DIT_data.ldif"
+    content: "{{ ldap_DIT.stdout }}"
+  tags: ldap_setup_syncprov
+  when: common_hostname == common_primary_dc
+  delegate_to: 127.0.0.1
+
+# Every follow task run on other hosts.
+- name: create LDIF for upload on other hosts
+  ansible.builtin.copy:
+    dest: "/tmp/DIT_data.ldif"
+    src: "/tmp/DIT_data.ldif"
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: delete /tmp/DIT_data.ldif on local host
+  ansible.builtin.file:
+    path: "/tmp/DIT_data.ldif"
+    state: absent
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+  delegate_to: 127.0.0.1
+
+- name: stop slapd on other hosts
+  ansible.builtin.service:
+    name: slapd
+    state: stopped
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: delete old data on replica
+  ansible.builtin.file:
+    path: "{{ ldap_db_directory }}"
+    state: absent
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: create {{ ldap_db_directory }} on replica
+  ansible.builtin.file:
+    path: "{{ ldap_db_directory }}"
+    state: directory
+    owner: "{{ ldap_system_user }}"
+    group: "{{ ldap_system_group }}"
+    mode: 0700
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: upload LDIF on others hosts
+  ansible.builtin.command: slapadd -l /tmp/DIT_data.ldif -w
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: delete /tmp/DIT_data.ldif on remote host
+  ansible.builtin.file:
+    path: "/tmp/DIT_data.ldif"
+    state: absent
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: set right ACLs on LDAP db dir
+  ansible.builtin.file:
+    path: "{{ ldap_db_directory }}"
+    state: directory
+    owner: "{{ ldap_system_user }}"
+    group: "{{ ldap_system_group }}"
+    mode: 0700
+    recurse: yes
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+
+- name: start slapd on other hosts
+  ansible.builtin.service:
+    name: slapd
+    state: started
+  tags: ldap_setup_syncprov
+  when: common_hostname != common_primary_dc
+### END: Copy DIT from {{ common_primary_dc }} to other hosts
+
+- name: get info about syncprov overlay
+  ansible.builtin.shell: | 
+    ldapsearch -Y EXTERNAL -H ldapi:/// -b '{{ ldap_db_dn }}' '(olcOverlay=syncprov)' 2>&1 | grep "olcOverlay:.*syncprov" && echo "YES" || echo "NO"
+  register: syncprov_exists
+  check_mode: no
+  tags: ldap_setup_syncprov,ldap_config_syncprov
 
 - name: add entry of syncprov overlay into LDAP
   community.general.ldap_entry:
@@ -14,43 +109,70 @@
     attributes:
       olcOverlay: "syncprov"
       olcSpCheckPoint: "{{ lspo.attrs.olcSpCheckPoint }}"
-      olcSpNoPresent: "{{ lspo.attrs.olcSpNoPresent | default(false) }}"
-      olcSpReloadHint: "{{ lspo.attrs.olcSpReloadHint | default(false) }}"
+      olcSpNoPresent: "{{ lspo.attrs.olcSpNoPresent | default(omit) }}"
+      olcSpReloadHint: "{{ lspo.attrs.olcSpReloadHint | default(omit) }}"
       olcSpSessionlog: "{{ lspo.attrs.olcSpSessionlog | default(omit) }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
-
-- name: add indexes for replication
-  community.general.ldap_attrs:
-    dn: "olcDatabase={{ ldap_config_db_type }},cn=config"
-    attributes:
-      olcDbIndex: "{{ item }}"
-    loop:
-      - "entryCSN eq"
-      - "entryUUID eq"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+  when: syncprov_exists.stdout == "NO"
 
 - name: add ServerID into cn=config
   community.general.ldap_attrs:
     dn: "cn=config"
     attributes:
-      olcServerID: "{{ item.ServerID }} {{ item.ldap_uri }}"
-  loop: "{{ ldap_nodes }}"
-  tags: ldap_setup,ldap_setup_overlays,ldap_setup_syncprov
+      olcServerID: "{{ ldap_ServerID }}"
+  tags: ldap_setup_syncprov,ldap_config_syncprov
 
-- name: 
+- name: get OlcSyncRepls
+  ansible.builtin.shell: | 
+    ldapsearch -Y EXTERNAL -H ldapi:/// -b 'olcDatabase={1}mdb,cn=config' '(olcSyncrepl=*)' 2>&1 \
+    | perl -MMIME::Base64 -n -00 -e 's/\n +//g;s/(?<=:: )(\S+)/decode_base64($1)/eg;print' \
+    | grep ^olcSyncrepl || echo "There is no sync settings"
+  register: syncset_exists
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+
+# if there is not list of Syncrepl attr and Syncrepl exist than there is follow error
+# failed: [desktop] (item={'ServerID': 1, 'ldap_uri': 'ldaps://srv01.mshurutov.home/'}) => {"ansible_loop_var": "item", "changed": false, "details": "{'msgtype': 103, 'msgid': 3, 'result': 20, 'desc': 'Type or value exists', 'ctrls': [], 'info': 'modify/add: olcSyncrepl: value #0 already exists'}", "item": {"ServerID": 1, "ldap_uri": "ldaps://srv01.mshurutov.home/"}, "msg": "Attribute action failed. "}  
+- name: add parameters of sync
   community.general.ldap_attrs:
-    dn: "olcDatabase={{ ldap_config_db_type }},cn=config"
+    dn: "{{ ldap_db_dn }}"
     attributes:
-      olcMirrorMode: TRUE
       olcSyncrepl: >
-        rid=00{{ item.ServerID }}
-        provider={{ item.ldap_uri }}
+        rid=00{{ prov.ServerID }}
+        provider={{ prov.ldap_uri }}
+        type=refreshAndPersist 
+        retry="{{ ldap_sync_retry }}"
+        searchbase="{{ ldap_base_suffix }}" 
+        attrs="*,+"
         bindmethod=simple 
         binddn="{{ ldap_rootdn }}"
-        credentials="{{ ldap_root_password }}" 
-        searchbase="{{ ldap_base_suffix }}" 
-        type=refreshAndPersist 
-        timeout=0 
-        network-timeout=0 
-        retry="60 +" 
-  
+        credentials={{ ldap_root_password }}
+  loop:  "{{ ldap_nodes }}"
+  loop_control:
+    loop_var: prov
+  when: prov.ldap_uri not in syncset_exists.stdout
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+
+# Follow commented block return error:
+# fatal: [desktop]: FAILED! => {"changed": false, "details": "{'msgtype': 103, 'msgid': 3, 'result': 21, 'desc': 'Invalid syntax', 'ctrls': [], 'info': 'olcMirrorMode: value #0 invalid per syntax'}", "msg": "Attribute action failed."}
+# if ldap_mirror_mode is not one from two STRINGS: "TRUE" or "FALSE"
+# False, True, true as ansible bool value cause error above
+- name: add MirrorMode
+  community.general.ldap_attrs:
+    dn: "{{ ldap_db_dn }}"
+    attributes:
+      olcMirrorMode: "{{ ldap_mirror_mode }}"
+    state: exact
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+
+- name: add indexes for replication
+  community.general.ldap_attrs:
+    dn: "{{ ldap_db_dn }}"
+    attributes:
+      olcDbIndex: "{{ idx }}"
+  loop:
+      - "entryCSN eq"
+      - "entryUUID eq"
+  loop_control:
+    loop_var: idx
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+

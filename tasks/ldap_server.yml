@@ -87,8 +87,8 @@
 - name: check if {{ ldap_tmp_ldif }} exists
   ansible.builtin.file:
     path: "{{ ldap_tmp_ldif }}"
-    state: 'directory'
-  tags: ldap_setup,ldap_schema_ldif
+    state: 'absent'
+  tags: ldap_setup,ldap_schema_dir
 
 - name: convert schema files to ldif
   become: yes
@@ -111,7 +111,7 @@
     state: started
   notify:
     - enable slapd
-  tags: ldap_setup,ldap_start
+  tags: ldap_setup,ldap_start,ldap_setup_overlays
 
 - name: check if ssl dir is exist
   file:
@@ -221,12 +221,6 @@
       tags: ldap_setup,ldap_setup_add_schemas
   when: ldap_ext_schemas is defined
 
-- name: add overlays
-  ansible.builtin.include_tasks: "{{ item.key }}.yml"
-  loop: "{{  lookup('ansible.builtin.dict', ldap_overlays, wantlist=True) }}"
-  when: ldap_overlays is defined
-  tags: ldap_setup,ldap_setup_overlays
-
 - name: add tree objects on primary_dc
   block: 
     - name: add Organization into LDAP
@@ -266,7 +260,7 @@
           check_mode: no
         - name: add access rights to Kerberos container
           community.general.ldap_attrs:
-            dn: "olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config"
+            dn: "{{ ldap_db_dn }}"
             attributes:
               olcAccess: "{{ '{' }}{{ acl_max_number.stdout | int + 1 }}{{ '}' }}to dn.subtree=\"{{ ldap_krb_pack }}\" by group.exact=\"{{ ldap_ops_group }}\" manage by group.exact=\"{{ ldap_krb_group }}\" manage by * none"
           when: acl_exist.stdout == ""
@@ -302,12 +296,6 @@
               sudoNotAfter: "{{ item.value.sudoNotAfter | default (omit) }}"
               sudoOrder: "{{ item.value.sudoOrder }}"
           loop: "{{  lookup('ansible.builtin.dict', ldap_sudo, wantlist=True) }}"
-        - name: edit /etc/nsswitch.conf
-          ansible.builtin.lineinfile:
-            path: "/etc/nsswitch.conf"
-            regexp: "^ *#? *sudoers"
-            line: "sudoers:    ldap files"
-            state: present
       when: ldap_sudo is defined
       tags: ldap_setup_tree,ldap_setup_sudo
     - name: add users to ldap
@@ -444,5 +432,29 @@
           member: "{{ item.1 }}"
       loop: "{{ lookup('ansible.builtin.dict', ldap_groups, wantlist=True) | subelements('value.member') }}"
       tags: ldap_setup_tree,ldap_groups
+    - name: add hosts into LDAP DIT
+      community.general.ldap_entry:
+        dn: "{{ item.0.value.dn }}"
+        objectClass:
+          - "ipHost"
+          - "device"
+        attributes:
+          ipHostNumber: "{{ item.1 }}"
+          cn: "{{ item.0.key }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
+      tags: ldap_setup_tree,ldap_hosts
+    - name: add other IP addresses
+      community.general.ldap_attrs:
+        dn: "{{ item.0.value.dn }}"
+        attributes:
+          ipHostNumber: "{{ item.1 }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
+      tags: ldap_setup_tree,ldap_hosts
   when: common_hostname == common_primary_dc
+
+- name: add overlays
+  ansible.builtin.include_tasks: "{{ item.key }}.yml"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_overlays, wantlist=True) }}"
+  when: ldap_overlays is defined
+  tags: ldap_setup,ldap_setup_overlays
 

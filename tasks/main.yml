@@ -1,5 +1,11 @@
 ---
 
+- name: load OS-specific variables
+  ansible.builtin.include_vars:
+    dir: "{{ ldap_vars_dir }}"
+    file: "{{ ansible_os_family }}.yml"
+  tags: ldap_install
+
 - name: install ldap service
   ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
   tags: ldap_install
@@ -17,7 +23,7 @@
     owner: "root"
     group: "root"
     mode: 0644
-  when: ! stat_ssl_ca.stat.stat.exists
+  when: ! stat_ssl_ca.stat.exists
   tags: ldap_ssl
 
 - name: setup server
@@ -45,4 +51,13 @@
     create: true
   loop: "{{ ldap_conf_params | ansible.builtin.combine(ldap_user_conf_params) | dict2items }}"
   tags: ldap_client_config
+
+- name: edit /etc/nsswitch.conf
+  ansible.builtin.lineinfile:
+    path: "/etc/nsswitch.conf"
+    regexp: "^ *#? *sudoers"
+    line: "sudoers:    ldap files"
+    state: present
+  when: ldap_sudo is defined
+  tags: ldap_client_config,ldap_setup_sudo
 
