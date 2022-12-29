@@ -1,20 +1,14 @@
 ---
 
-- name: load OS-specific variables
-  ansible.builtin.include_vars:
-    dir: "{{ ldap_vars_dir }}"
-    file: "{{ ansible_os_family }}.yml"
-  tags: ldap_install
-
-- name: install ldap service
+- name: install auth services`
   ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
-  tags: ldap_install
+  tags: auth_install
 
 - name: check if local CA is exist on target host
   ansible.builtin.stat:
     path: "{{ common_ssl_CA }}"
   register: stat_ssl_ca
-  tags: ldap_ssl
+  tags: auth_ssl
 
 - name: copy root CA to target host
   ansible.builtin.copy:
@@ -24,7 +18,7 @@
     group: "root"
     mode: 0644
   when: ! stat_ssl_ca.stat.exists
-  tags: ldap_ssl
+  tags: auth_ssl
 
 - name: setup server
   ansible.builtin.import_tasks: ldap_server.yml
@@ -52,7 +46,30 @@
   loop: "{{ ldap_conf_params | ansible.builtin.combine(ldap_user_conf_params) | dict2items }}"
   tags: ldap_client_config
 
-- name: edit /etc/nsswitch.conf
+- name: configure auth service if auth_type is not ldap
+  ansible.builtin.include_tasks: "{{ auth_type }}.yml" 
+  when: auth_type != "ldap"
+  tags: auth_service_setup
+
+- name: configure auth mech if auth_mech is not ldap
+  ansible.builtin.include_tasks: "{{ auth_mech }}.yml" 
+  when: auth_mech != "ldap"
+  tags: auth_mech_setup
+
+- name: add passwd/shadow/group over {{ auth_mech }} into /etc/nsswitch.conf
+  ansible.builtin.lineinfile:
+    path: "/etc/nsswitch.conf"
+    regexp: "{{ item }}"
+    line: '\1:\2{{ auth_mech }} \3'
+    state: present
+    backrefs: yes
+  loop:
+    - "^(passwd):([ \t]*).*(files).*$"
+    - "^(shadow):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
+    - "^(group):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
+  tags: auth_mech_config
+
+- name: add sudo over ldap into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "^ *#? *sudoers"

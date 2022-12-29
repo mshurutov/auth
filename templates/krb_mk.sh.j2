@@ -1,0 +1,11 @@
+#!/usr/bin/expect -f
+
+set pwd [lindex $argv 0];
+set prompt "(%|#|\\$) $"          ;# default prompt
+catch {set prompt $env(EXPECT_PROMPT)}
+
+spawn kdb5_util stash
+expect "Enter KDC database master key:"
+send "$pwd\r"
+expect -re $prompt
+

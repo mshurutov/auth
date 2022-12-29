@@ -37,7 +37,7 @@
 ## Copy initial ldif
     - name: copy templates to target host
       ansible.builtin.template:
-        src: "{{ ldap_templates_dir }}/init.ldif.j2"
+        src: "{{ auth_templates_dir }}/init.ldif.j2"
         dest: /tmp/openldap/init.ldif
       tags: ldap_init
 ## Create config and data DB dirs
@@ -77,7 +77,7 @@
 
 - name: copy schema2ldif.sh to target host
   ansible.builtin.copy:
-    src: "{{ ldap_files_dir }}/schema2ldif.sh"
+    src: "{{ auth_files_dir }}/schema2ldif.sh"
     dest: "{{ ldap_admin_path }}/"
     owner: 'root'
     group: 'root'
@@ -265,7 +265,7 @@
               olcAccess: "{{ '{' }}{{ acl_max_number.stdout | int + 1 }}{{ '}' }}to dn.subtree=\"{{ ldap_krb_pack }}\" by group.exact=\"{{ ldap_ops_group }}\" manage by group.exact=\"{{ ldap_krb_group }}\" manage by * none"
           when: acl_exist.stdout == ""
       tags: ldap_setup_tree,ldap_setup_krb
-      when: common_auth_method == "kerberos"
+      when: auth_type == "krb5"
     - name: add sudo over ldap support
       block:
         - name: add sudo entries to ldap

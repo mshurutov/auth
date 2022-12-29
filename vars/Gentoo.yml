@@ -1,8 +1,0 @@
----
-
-# LDAP variables for Gentoo distribution
-ldap_packages:
-  - openldap
-  - python-ldap
-  - dev-python/cryptography
-slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"

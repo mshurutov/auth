@@ -1,0 +1,167 @@
+---
+
+- name: load OS-specific variables
+  ansible.builtin.include_vars:
+    file: "{{ auth_vars_dir }}/{{ ansible_os_family }}.yml"
+  tags: krb_install
+
+- name: create /etc/krb5.conf
+  ansible.builtin.template:
+    src: "{{ auth_templates_dir }}/krb5.conf.j2"
+    dest: "{{ krb_common_config }}"
+    owner: "root"
+    group: "root"
+  tags: krb_config,krb_client_config,krb_common_config
+
+- name: create server configs
+  block:
+    - name: copy script for create stash file to target host
+      ansible.builtin.template:
+        src: "{{ item }}"
+        dest: "/root/{{ item | basename | regex_replace('.j2') }}"
+        owner: "root"
+        group: "root"
+        mode: 0700
+      with_fileglob:
+        - "{{ auth_templates_dir }}/krb*.sh.j2"
+      tags: krb_config,krb_kdc_config
+    - name: create stashe file
+      ansible.builtin.command: "/root/krb_stash.sh {{ ldap_krb_admin }} {{ ldap_krb_admin_password}}"
+      tags: krb_config,krb_kdc_config
+    - name: create {{ krb_kdc_config }}
+      ansible.builtin.template:
+        src: "{{ auth_templates_dir }}/kdc.conf.j2"
+        dest: "{{ krb_kdc_config }}"
+        owner: "root"
+        group: "root"
+      tags: krb_config,krb_kdc_config
+    - name: create {{ krb_acl_config }}
+      ansible.builtin.lineinfile:
+        path: "{{ krb_acl_config  }}"
+        line: "{{ item }}"
+        state: present
+        create: true
+      loop: "{{ krb_db_acls | default([]) }}"
+      when: krb_db_acls is defined
+      tags: krb_config,krb_kdc_config
+    - name: create Kerberos structure in LDAP
+      ansible.builtin.command: "kdb5_ldap_util create {% if krb_subtrees is defined %}-subtrees \"{{ krb_subtrees }}\"{% endif %} -P {{ ldap_krb_admin_password }} -r {{ krb_default_realm }}"
+      tags: krb_config,krb_init_ldap
+      when: common_hostname == common_primary_dc and krb_krb5_db_type == "kldap" and krb_init_force is defined and krb_init_force | bool
+    - name: check if master key is not exist
+      ansible.builtin.file:
+        path: "{{ krb_krb5_db_path }}/.k5.{{ krb_default_realm }}"
+        state: absent
+      when: common_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
+      tags: krb_config,krb_kdc_config
+    - name: create master key on other hosts
+      ansible.builtin.command: "/root/krb_mk.sh {{ ldap_krb_admin_password}}"
+      when: common_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
+      tags: krb_config,krb_kdc_config
+    - name: restart kdc
+      ansible.builtin.service:
+        name: mit-krb5kdc
+        state: restarted
+      tags: krb_config,krb_init_ldap
+      when: krb_init_force is defined and krb_init_force | bool
+    - name: restart kadmind
+      ansible.builtin.service:
+        name: mit-krb5kadmind
+        state: restarted
+      tags: krb_config,krb_init_ldap
+      when: krb_init_force is defined and krb_init_force | bool
+  when: krb_is_server is defined and krb_is_server | bool
+
+- name: create principals
+  block:
+    - name: get list of principals
+      ansible.builtin.command: "kadmin.local list_principals"
+      check_mode: no
+      register: list_principals
+      tags: krb_add_principals
+    - name: create principals in ldap for exist users
+      ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ user.value.dn }}\" {{ user.key }}@{{ krb_default_realm }}"
+      when: user.key not in list_principals.stdout
+      loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+      loop_control:
+        loop_var: user
+      tags: krb_add_principals
+    - name: create principals in ldap for exist hosts
+      ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ host.value.dn }}\" host/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
+      when: host.key not in list_principals.stdout
+      loop: "{{  lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+      loop_control:
+        loop_var: host
+      tags: krb_add_principals
+    - name: add indexes into LDAP db
+      community.general.ldap_attrs:
+        dn: "{{ ldap_db_dn }}"
+        attributes:
+          olcDbIndex: "{{ item }}"
+      loop:
+        - "ou eq"
+        - "krbPrincipalName eq"
+      when: krb_krb5_db_type == "kldap"
+      tags: krb_idx_principals
+  when: common_hostname == common_primary_dc
+
+- name: create host keytab file for kdc
+  ansible.builtin.command: "kadmin.local ktadd host/{{ common_hostname }}"
+  when: krb_is_server is defined and krb_is_server | bool
+  tags: krb_client_config
+
+- name: create host keytab for other hosts
+  block:
+    - name: check if directory for keytabs exists
+      ansible.builtin.file:
+        path: "/tmp/kdc"
+        state: directory
+      tags: krb_client_config
+    - name: check if local directory for keytabs exists
+      ansible.builtin.file:
+        path: "/tmp/kdc"
+        state: directory
+        mode: 0777
+      delegate_to: 127.0.0.1
+      tags: krb_client_config
+    - name: create host keytabs on primary KDC
+      ansible.builtin.command: "kadmin.local ktadd -k /tmp/kdc/{{ item }}.keytab host/{{ item }}.{{ common_domain_name }}"
+      loop: "{{ query('inventory_hostnames', common_pc_group) }}"
+      tags: krb_client_config
+    - name: copy keytab files to local temp path
+      ansible.posix.synchronize:
+        dest: "/tmp/kdc/"
+        src: "/tmp/kdc/*"
+        mode: pull
+      tags: krb_client_config
+    - name: copy files from temp dir to local store
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ common_local_store }}/" 
+      delegate_to: 127.0.0.1
+      with_fileglob:
+        - "/tmp/kdc/*keytab"
+      tags: krb_client_config
+    - name: check if directory for keytabs removed
+      ansible.builtin.file:
+        path: "/tmp/kdc"
+        state: absent
+      tags: krb_client_config
+    - name: check if local directory for keytabs removed
+      ansible.builtin.file:
+        path: "/tmp/kdc"
+        state: absent
+      delegate_to: 127.0.0.1
+      tags: krb_client_config
+  when: common_hostname == common_primary_dc
+
+- name: copy keytab to remote host
+  ansible.builtin.copy:
+    src: "{{ common_local_store }}/{{ ansible_hostname }}.keytab"
+    dest: "/etc/krb5.keytab"
+    owner: 'root'
+    group: 'root'
+    mode: 0600
+  when: krb_is_server is not defined or not krb_is_server | bool
+  tags: krb_client_config
+

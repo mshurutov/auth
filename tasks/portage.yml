@@ -2,11 +2,11 @@
 
 - name: check if openldap is installed
   community.general.portage:
-    package: "{{ ldap_packages }}"
+    package: "{{ auth_packages }}"
     state: present
-  tags: ldap_install
+  tags: auth_install
 
-- name: configure daemon
+- name: configure slapd daemon
   block:
     - name: disable slapd.conf
       ansible.builtin.lineinfile:
@@ -20,5 +20,6 @@
         regexp: '^#?\s*(OPTS_CONF="-F /etc/.*/slapd.d")'
         line: '\1'
         backrefs: yes
-  tags: ldap_install
+  tags: ldap_install_config
   when: ldap_is_server is defined and ldap_is_server | bool
+

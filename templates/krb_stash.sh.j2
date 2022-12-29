@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+
+set user [lindex $argv 0];
+set pwd [lindex $argv 1];
+set prompt "(%|#|\\$) $"          ;# default prompt
+catch {set prompt $env(EXPECT_PROMPT)}
+
+spawn kdb5_ldap_util stashsrvpw -f {{ krb_stash_file }} $user
+expect "Password for \"$user\":"
+send "$pwd\r"
+expect "Re-enter password for \"$user\":"
+send "$pwd\r"
+expect -re $prompt

@@ -1,0 +1,219 @@
+# /etc/krb5.conf - common config file for MIT Kerberos v5
+# This file is managed by ansible. Do not edit it manually!
+
+[libdefaults]
+{% if krb_allow_weak_crypto is defined %}
+	allow_weak_crypto = {{ krb_allow_weak_crypto }}
+{% endif %}
+{% if krb_canonicalize is defined %}
+	canonicalize = {{ krb_canonicalize }}
+{% endif %}
+{% if krb_ccache_type is defined %}
+	ccache_type = {{ krb_ccache_type }}
+{% endif %}
+{% if krb_clockskew is defined %}
+	clockskew = {{ krb_clockskew }}
+{% endif %}
+{% if krb_default_ccache_name is defined %}
+	default_ccache_name = {{ krb_default_ccache_name }}
+{% endif %}
+{% if krb_default_client_keytab_name is defined %}
+	default_client_keytab_name = {{ krb_default_client_keytab_name }}
+{% endif %}
+{% if krb_default_keytab_name is defined %}
+	default_keytab_name = {{ krb_default_keytab_name }}
+{% endif %}
+{% if krb_default_rcache_name is defined %}
+	default_rcache_name = {{ krb_default_rcache_name }}
+{% endif %}
+	default_realm = {{ krb_default_realm }}
+{% if krb_default_tgs_enctypes is defined %}
+	default_tgs_enctypes = {{ krb_default_tgs_enctypes }}
+{% endif %}
+{% if krb_default_tkt_enctypes is defined %}
+	default_tkt_enctypes = {{ krb_default_tkt_enctypes }}
+{% endif %}
+{% if krb_dns_canonicalize_hostname is defined %}
+	dns_canonicalize_hostname = {{ krb_dns_canonicalize_hostname }}
+{% endif %}
+{% if krb_dns_lookup_kdc is defined %}
+	dns_lookup_kdc = {{ krb_dns_lookup_kdc }}
+{% endif %}
+{% if krb_dns_uri_lookup is defined %}
+	dns_uri_lookup = {{ krb_dns_uri_lookup }}
+{% endif %}
+{% if krb_enforce_ok_as_delegate is defined %}
+	enforce_ok_as_delegate = {{ krb_enforce_ok_as_delegate }}
+{% endif %}
+{% if krb_err_fmt is defined %}
+	err_fmt = {{ krb_err_fmt }}
+{% endif %}
+{% if krb_extra_addresses is defined %}
+	extra_addresses = {{ krb_extra_addresses }}
+{% endif %}
+{% if krb_forwardable is defined %}
+	forwardable = {{ krb_forwardable }}
+{% endif %}
+{% if krb_ignore_acceptor_hostname is defined %}
+	ignore_acceptor_hostname = {{ krb_ignore_acceptor_hostname }}
+{% endif %}
+{% if krb_k5login_authoritative is defined %}
+	k5login_authoritative = {{ krb_k5login_authoritative }}
+{% endif %}
+{% if krb_k5login_directory is defined %}
+	k5login_directory = {{ krb_k5login_directory }}
+{% endif %}
+{% if krb_kcm_mach_service is defined %}
+	kcm_mach_service = {{ krb_kcm_mach_service }}
+{% endif %}
+{% if krb_kcm_socket is defined %}
+	kcm_socket = {{ krb_kcm_socket }}
+{% endif %}
+{% if krb_kdc_default_options is defined %}
+	kdc_default_options = {{ krb_kdc_default_options }}
+{% endif %}
+{% if krb_kdc_timesync is defined %}
+	kdc_timesync = {{ krb_kdc_timesync }}
+{% endif %}
+{% if krb_noaddresses is defined %}
+	noaddresses = {{ krb_noaddresses }}
+{% endif %}
+{% if krb_permitted_enctypes is defined %}
+	permitted_enctypes = {{ krb_permitted_enctypes }}
+{% endif %}
+{% if krb_plugin_base_dir is defined %}
+	plugin_base_dir = {{ krb_plugin_base_dir }}
+{% endif %}
+{% if krb_preferred_preauth_types is defined %}
+	preferred_preauth_types = {{ krb_preferred_preauth_types }}
+{% endif %}
+{% if krb_proxiable is defined %}
+	proxiable = {{ krb_proxiable }}
+{% endif %}
+{% if krb_qualify_shortname is defined %}
+	qualify_shortname = {{ krb_qualify_shortname }}
+{% endif %}
+{% if krb_rdns is defined %}
+	rdns = {{ krb_rdns }}
+{% endif %}
+{% if krb_realm_try_domains is defined %}
+	realm_try_domains = {{ krb_realm_try_domains }}
+{% endif %}
+{% if krb_renew_lifetime is defined %}
+	renew_lifetime = {{ krb_renew_lifetime }}
+{% endif %}
+{% if krb_spake_preauth_groups is defined %}
+	spake_preauth_groups = {{ krb_spake_preauth_groups }}
+{% endif %}
+{% if krb_ticket_lifetime is defined %}
+	ticket_lifetime = {{ krb_ticket_lifetime }}
+{% endif %}
+{% if krb_udp_preference_limit is defined %}
+	udp_preference_limit = {{ krb_udp_preference_limit }}
+{% endif %}
+{% if krb_verify_ap_req_nofail is defined %}
+	verify_ap_req_nofail = {{ krb_verify_ap_req_nofail }}
+{% endif %}
+{% if krb_client_aware_channel_bindings is defined %}
+	client_aware_channel_bindings = {{ krb_client_aware_channel_bindings }}
+	{% endif %}
+
+[realms]
+{% for kr in krb_realms %}
+	{{ kr.realm }} = {
+{% for srv in kr.admin_server %}
+		admin_server = {{ srv }}
+{% endfor %}
+{% if kr.auth_to_local is defined %}
+{% for rule in kr.auth_to_local %}
+		auth_to_local = {{ rule }}
+{% endfor %}
+{% endif %}
+{% if kr.auth_to_local_names is defined %}
+{% for map in kr.auth_to_local_names %}
+		auth_to_local_names = {{ map }}
+{% endfor %}
+{% endif %}
+{% if kr.default_domain is defined %}
+		default_domain = {{ kr.default_domain }}
+{% endif %}
+{% if kr.disable_encrypted_timestamp is defined %}
+		disable_encrypted_timestamp = {{ kr.disable_encrypted_timestamp }}
+{% endif %}
+{% if kr.http_anchors is defined %}
+{% for ha in kr.http_anchors %}
+		http_anchors = {{ ha }}
+{% endfor %}
+{% endif %}
+{% for srv in kr.kdc %}
+		kdc = {{ srv }}
+{% endfor %}
+{% if kr.kpasswd_server is defined %}
+{% for srv in kr.kpasswd_server %}
+		kpasswd_server = {{ srv }}
+{% endfor %}
+{% endif %}
+{% if kr.master_kdc is defined %}
+		master_kdc = {{ kr.master_kdc }}
+{% endif %}
+{% if kr.primary_kdc is defined %}
+		primary_kdc = {{ kr.primary_kdc }}
+{% endif %}
+{% if kr.v4_instance_convert is defined %}
+{% for rule in kr.v4_instance_convert %}
+		v4_instance_convert = {{ rule }}
+{% endfor %}
+{% endif %}
+{% if kr.v4_realm is defined %}
+		v4_realm = {{ kr.v4_realm }}
+{% endif %}
+	}
+{% endfor %}
+{% if krb_domain_realm is defined %}
+
+[domain_realm]
+{% for dr in krb_domain_realm %}
+	{{ dr.domain }} = {{ dr.realm }}
+{% endfor %}
+{% endif %}
+
+{% if krb_capaths is defined %}
+[capaths]
+{% for kc in krb_capaths %}
+	{{ kc.realm }} = {
+{% for kcm in kc.maps %}
+		{{ kcm.key }} = {{ kcm.map }}
+{% endfor %}
+	}
+{%endfor %}
+{% endif %}
+{% if krb_appdefaults is defined %}
+
+[appdefaults]
+{% for ad in krb_appdefaults %}
+{% if ad.apps is defined %}
+{% for app in ad.apps %}
+	{{ app.name }} = {
+{% if app.realms is defined %}
+{% for ar in app.realms %}
+		{{ ar.name }} = {
+{% for opts in ar.options %}
+			{{ opts.name }} = {{ opts.name }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% if app.options is defined %}
+{% for ao in app.options %}
+		{{ ao.name }} = {{ ao.value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if ad.options is defined %}
+{% for opt in ad.options %}
+	{{ opt.name }} = {{ opt.value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+

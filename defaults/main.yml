@@ -1,8 +1,24 @@
-ldap_templates_dir: "{{ role_path }}/templates"
-ldap_files_dir: "{{ role_path }}/files"
-ldap_vars_dir: "{{ role_path }}/vars"
-ldap_system_user: "ldap"
-ldap_system_group: "ldap"
+---
+
+# Common parameters for all tasks in role
+auth_type: "krb5" # may be ldap
+auth_mech: "sssd" # may be ?
+auth_templates_dir: "{{ role_path }}/templates"
+auth_files_dir: "{{ role_path }}/files"
+auth_vars_dir: "{{ role_path }}/vars"
+auth_admin_path: "/usr/loca/sbin"
+# System settings for ldap part: files and dirs, system users and groups, connection info etc
+# settings for install need services (default distro - Gentoo)
+auth_packages:
+  - "openldap"
+  - "python-ldap"
+  - "dev-python/cryptography"
+  - "sys-auth/sssd"
+  - "app-crypt/mit-krb5"
+  - "dev-tcltk/expect"
+  - "sys-auth/pam_krb5"
+slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
+# Files and directories
 ldap_config_dir: "/etc/openldap"
 ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
 ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
@@ -11,28 +27,38 @@ ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name 
 ldap_ssl_csr: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name }}.csr"
 ldap_ssl_cert: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name }}.crt"
 ldap_module_path: "/usr/lib64/openldap/openldap"
-ldap_admin_path: "/usr/loca/sbin"
+ldap_db_directory: "/var/lib/openldap-data"
+# System user and group
+ldap_system_user: "ldap"
+ldap_system_group: "ldap"
+# Connection info: ports
 ldap_port: 389
 ldap_ssl_port: 686
+# Config parameters for files
 ldap_slapd_urls_regexp: "^Environment=.*"
 ldap_slapd_urls: 'Environment="SLAPD_URLS=ldaps:/// ldapi:///"'
+
+# LDAP settings for service (OLC-way)
+# modules
 ldap_default_modules:
   - "back_mdb.so"
+# schemas
 ldap_default_schemas:
   - "core"
   - "cosine"
   - "inetorgperson"
+# schemas for convert from *.schema to *.ldif
 ldap_schema_only:
   - "kerberos"
   - "rfc2307bis"
   - "samba"
   - "sudo"
+# Any other settings
 ldap_loglevel: "stats stats2"
+ldap_db_config_max_size: 1073741824 
 ldap_config_db_type: "mdb"
 ldap_db_data_number: 1
 ldap_db_dn: "olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config"
-ldap_db_directory: "/var/lib/openldap-data"
-ldap_db_config_max_size: 1073741824 
 ldap_base_name: "mycompany"
 ldap_organization_name: "Example Company"
 ldap_organization_desc: "Mycompany company"
@@ -43,9 +69,9 @@ ldap_server_uri: "ldapi:///"
 ldap_conf_params:
   BASE: "{{ ldap_base_suffix }}"
   URI: "ldap://{{ ansible_hostname }}"
-ldap_user_conf_params:
-  BINDDN: "{{ ldap_reader_dn }}"
-  BINDPW: "base64:{{ ldap_reader_password | string | b64encode }}"
+#ldap_user_conf_params:
+#  BINDDN: "{{ ldap_reader_dn }}"
+#  BINDPW: "base64:{{ ldap_reader_password | string | b64encode }}"
 ldap_ops_group: "cn=ops,ou=groups,{{ ldap_base_suffix }}"
 ldap_bs_acl:
   - '{0}to attrs=userPassword
@@ -58,6 +84,7 @@ ldap_bs_acl:
     by group.exact="{{ ldap_ops_group }}" write
     by users read
     by * none'
+# Settings for create objects
 ldap_default_ous:
   - ou: "users"
     dn: "ou=users,{{ ldap_base_suffix }}"
@@ -76,3 +103,74 @@ ldap_memberof_member_ad: "member"
 ldap_memberof_memberof_ad: "memberOf"
 ldap_memberof_refint: "FALSE"
 ldap_spcheckpoint: "5 60"
+
+### defaults values for krb auth ###
+# Pathes and files
+krb_krb5_db_path: "/var/lib/krb5kdc"
+krb_krb5_kdc_config_path: "{{ krb_krb5_db_path }}"
+krb_kdc_config: "{{ krb_krb5_kdc_config_path }}/kdc.conf"
+krb_acl_config: "{{ krb_krb5_kdc_config_path }}/kadm5.acl"
+krb_stash_file: "{{ krb_krb5_kdc_config_path }}/kdc.stash"
+krb_common_config: "/etc/krb5.conf"
+# Netrwotk settings
+krb_kdc_port: 88
+krb_kadmin_port: 749
+krb_pwd_port: 464
+
+# common config parameters
+krb_krb5_db_type: "klmdb"
+krb_default_realm: "{{ common_domain_name | upper }}"
+krb_realms:
+  - realm: "{{ krb_default_realm }}"
+    kdc:
+      - "{{ common_primary_dc }}"
+      - "{{ common_secondary_dc if common_secondary_dc is defined }}"
+    admin_server:
+      - "{{ common_primary_dc }}"
+    default_domain: "{{ common_domain_name }}"
+krb_logging:
+  - default: "SYSLOG:ERR:DAEMON"
+# Example of krb_appdefaults
+#krb_appdefaults:
+#  apps:
+#    app1:
+#      name: telnet
+#      realms:
+#        - name: EXAMPLE.COM
+#          options:
+#            - name: O1
+#              value: V1
+#            - name: O2
+#              value: V2
+#        - name: SAMPLE.ORG
+#          options:
+#            - name: op1
+#              value: val01
+#            - name: op2
+#              value: val02
+#            - name: op3
+#              value: val03
+#    app2:
+#      name: telnet
+#      options:
+#        - name: name1
+#          value: value1
+#        - name: name2
+#          value: value2
+#  options
+#    - name: name1
+#      value: value1
+#    - name: name2
+#      value: value2
+
+# Settings for sssd service
+sssd_services_list: "nss,pam"
+sssd_default_domain_id_provider: "ldap"
+sssd_default_domain_auth_provider: "krb5"
+sssd_services_default:
+  - name: "nss"
+    options:
+      - filter_users: "adm,bin,daemon,root"
+  - name: "pam"
+  - name: "sudo"
+  - name: "ssh"

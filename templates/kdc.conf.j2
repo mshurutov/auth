@@ -1,0 +1,348 @@
+# {{ krb_kdc_config }} KDC config file.
+# This file is managed by ansible. Do not edit it manually!
+{% if krb_kdcdefaults is defined %}
+
+[kdcdefaults]
+{% for def in krb_kdcdefaults %}
+	{{ def.key }} = {{ def.value }}
+{% endfor %}
+{% endif %}
+
+[realms]
+{% for kr in krb_realms %}
+	{{ kr.realm }} = {
+{% if kr.acl_file is defined %}
+		acl_file = {{ kr.acl_file }}
+{% endif %}
+{% if kr.database_module is defined %}
+		database_module = {{ kr.database_module }}
+{% endif %}
+{% if kr.default_principal_expiration is defined %}
+		default_principal_expiration = {{ kr.default_principal_expiration }}
+{% endif %}
+{% if kr.default_principal_flags is defined %}
+		default_principal_flags = {% for dpf in kr.default_principal_flags %}{{ dpf }}{% if not loop.last %},{% endif %}{% endfor %}
+{% endif %}
+{% if kr.dict_file is defined %}
+		dict_file = {{ kr.dict_file }}
+{% endif %}
+{% if kr.disable_pac is defined %}
+		disable_pac = {{ kr.disable_pac }}
+{% endif %}
+{% if kr.encrypted_challenge_indicator is defined %}
+		encrypted_challenge_indicator = {{ kr.encrypted_challenge_indicator }}
+{% endif %}
+{% if kr.host_based_services is defined %}
+		host_based_services = {{ kr.host_based_services }}
+{% endif %}
+{% if kr.iprop_enable is defined %}
+		iprop_enable = {{ kr.iprop_enable }}
+{% endif %}
+{% if kr.iprop_ulogsize is defined %}
+		iprop_ulogsize = {{ kr.iprop_ulogsize }}
+{% endif %}
+{% if kr.iprop_master_ulogsize is defined %}
+		iprop_master_ulogsize = {{ kr.iprop_master_ulogsize }}
+{% endif %}
+{% if kr.iprop_replica_poll is defined %}
+		iprop_replica_poll = {{ kr.iprop_replica_poll }}
+{% endif %}
+{% if kr.iprop_slave_poll is defined %}
+		iprop_slave_poll = {{ kr.iprop_slave_poll }}
+{% endif %}
+{% if kr.iprop_listen is defined %}
+		iprop_listen = {{ kr.iprop_listen }}
+{% endif %}
+{% if kr.iprop_port is defined %}
+		iprop_port = {{ kr.iprop_port }}
+{% endif %}
+{% if kr.iprop_resync_timeout is defined %}
+		iprop_resync_timeout = {{ kr.iprop_resync_timeout }}
+{% endif %}
+{% if kr.iprop_logfile is defined %}
+		iprop_logfile = {{ kr.iprop_logfile }}
+{% endif %}
+{% if kr.kadmind_listen is defined %}
+		kadmind_listen = {{ kr.kadmind_listen }}
+{% endif %}
+{% if kr.kadmind_port is defined %}
+		kadmind_port = {{ kr.kadmind_port }}
+{% endif %}
+{% if kr.key_stash_file is defined %}
+		key_stash_file = {{ kr.key_stash_file }}
+{% endif %}
+{% if kr.kdc_listen is defined %}
+		kdc_listen = {{ kr.kdc_listen }}
+{% endif %}
+{% if kr.kdc_ports is defined %}
+		kdc_ports = {{ kr.kdc_ports }}
+{% endif %}
+{% if kr.kdc_tcp_listen is defined %}
+		kdc_tcp_listen = {{ kr.kdc_tcp_listen }}
+{% endif %}
+{% if kr.kdc_tcp_ports is defined %}
+		kdc_tcp_ports = {{ kr.kdc_tcp_ports }}
+{% endif %}
+{% if kr.kpasswd_listen is defined %}
+		kpasswd_listen = {{ kr.kpasswd_listen }}
+{% endif %}
+{% if kr.kpasswd_port is defined %}
+		kpasswd_port = {{ kr.kpasswd_port }}
+{% endif %}
+{% if kr.master_key_name is defined %}
+		master_key_name = {{ kr.master_key_name }}
+{% endif %}
+{% if kr.master_key_type is defined %}
+		master_key_type = {{ kr.master_key_type }}
+{% endif %}
+{% if kr.max_life is defined %}
+		max_life = {{ kr.max_life }}
+{% endif %}
+{% if kr.max_renewable_life is defined %}
+		max_renewable_life = {{ kr.max_renewable_life }}
+{% endif %}
+{% if kr.no_host_referral is defined %}
+		no_host_referral = {{ kr.no_host_referral }}
+{% endif %}
+{% if kr.reject_bad_transit is defined %}
+		reject_bad_transit = {{ kr.reject_bad_transit }}
+{% endif %}
+{% if kr.restrict_anonymous_to_tgt is defined %}
+		restrict_anonymous_to_tgt = {{ kr.restrict_anonymous_to_tgt }}
+{% endif %}
+{% if kr.spake_preauth_indicator is defined %}
+		spake_preauth_indicator = {{ kr.spake_preauth_indicator }}
+{% endif %}
+{% if kr.supported_enctypes is defined %}
+		supported_enctypes = {{ kr.supported_enctypes }}
+{% endif %}
+{% if kr.pkinit_anchors is defined %}
+		pkinit_anchors = {{ kr.pkinit_anchors }}
+{% endif %}
+{% if kr.pkinit_dh_min_bits is defined %}
+		pkinit_dh_min_bits = {{ kr.pkinit_dh_min_bits }}
+{% endif %}
+{% if kr.pkinit_allow_upn is defined %}
+		pkinit_allow_upn = {{ kr.pkinit_allow_upn }}
+{% endif %}
+{% if kr.pkinit_eku_checking is defined %}
+		pkinit_eku_checking = {{ kr.pkinit_eku_checking }}
+{% endif %}
+{% if kr.pkinit_identity is defined %}
+		pkinit_identity = {{ kr.pkinit_identity }}
+{% endif %}
+{% if kr.pkinit_indicator is defined %}
+		pkinit_indicator = {{ kr.pkinit_indicator }}
+{% endif %}
+{% if kr.pkinit_pool is defined %}
+		pkinit_pool = {{ kr.pkinit_pool }}
+{% endif %}
+{% if kr.pkinit_revoke is defined %}
+		pkinit_revoke = {{ kr.pkinit_revoke }}
+{% endif %}
+{% if kr.pkinit_require_crl_checking is defined %}
+		pkinit_require_crl_checking = {{ kr.pkinit_require_crl_checking }}
+{% endif %}
+{% if kr.pkinit_require_freshness is defined %}
+		pkinit_require_freshness = {{ kr.pkinit_require_freshness }}
+{% endif %}
+	}
+{% endfor %}
+{% if krb_dbdefaults is defined %}
+
+[dbdefaults]
+{% for kdb in krb_dbdefaults %}
+{% if kdb.database_name is defined %}
+	database_name = {{ kdb.database_name }}
+{% endif %}
+{% if kdb.db_library is defined %}
+	db_library = {{ krb_krb5_db_type }}
+{% endif %}
+{% if kdb.disable_last_success is defined %}
+	disable_last_success = {{ kdb.disable_last_success }}
+{% endif %}
+{% if kdb.disable_lockout is defined %}
+	disable_lockout = {{ kdb.disable_lockout }}
+{% endif %}
+{% if kdb.ldap_conns_per_server is defined %}
+	ldap_conns_per_server = {{ kdb.ldap_conns_per_server }}
+{% endif %}
+{% if kdb.ldap_kdc_dn is defined %}
+	ldap_kdc_dn = {{ kdb.ldap_kdc_dn }}
+{% endif %}
+{% if kdb.ldap_kadmind_dn is defined %}
+	ldap_kadmind_dn = {{ kdb.ldap_kadmind_dn }}
+{% endif %}
+{% if kdb.ldap_kdc_sasl_mech is defined %}
+	ldap_kdc_sasl_mech = {{ kdb.ldap_kdc_sasl_mech }}
+{% endif %}
+{% if kdb.ldap_kadmind_sasl_mech is defined %}
+	ldap_kadmind_sasl_mech = {{ kdb.ldap_kadmind_sasl_mech }}
+{% endif %}
+{% if kdb.ldap_kdc_sasl_authcid is defined %}
+	ldap_kdc_sasl_authcid = {{ kdb.ldap_kdc_sasl_authcid }}
+{% endif %}
+{% if kdb.ldap_kadmind_sasl_authcid is defined %}
+	ldap_kadmind_sasl_authcid = {{ kdb.ldap_kadmind_sasl_authcid }}
+{% endif %}
+{% if kdb.ldap_kdc_sasl_authzid is defined %}
+	ldap_kdc_sasl_authzid = {{ kdb.ldap_kdc_sasl_authzid }}
+{% endif %}
+{% if kdb.ldap_kadmind_sasl_authzid is defined %}
+	ldap_kadmind_sasl_authzid = {{ kdb.ldap_kadmind_sasl_authzid }}
+{% endif %}
+{% if kdb.ldap_kdc_sasl_realm is defined %}
+	ldap_kdc_sasl_realm = {{ kdb.ldap_kdc_sasl_realm }}
+{% endif %}
+{% if kdb.ldap_kadmind_sasl_realm is defined %}
+	ldap_kadmind_sasl_realm = {{ kdb.ldap_kadmind_sasl_realm }}
+{% endif %}
+{% if kdb.ldap_kerberos_container_dn is defined %}
+	ldap_kerberos_container_dn = {{ kdb.ldap_kerberos_container_dn }}
+{% endif %}
+{% if kdb.ldap_servers is defined %}
+	ldap_servers = {{ kdb.ldap_servers }}
+{% endif %}
+{% if kdb.ldap_service_password_file is defined %}
+	ldap_service_password_file = {{ kdb.ldap_service_password_file }}
+{% endif %}
+{% if kdb.mapsize is defined %}
+	mapsize = {{ kdb.mapsize }}
+{% endif %}
+{% if kdb.max_readers is defined %}
+	max_readers = {{ kdb.max_readers }}
+{% endif %}
+{% if kdb.nosync is defined %}
+	nosync = {{ kdb.nosync }}
+{% endif %}
+{% if kdb.unlockiter is defined %}
+	unlockiter = {{ kdb.unlockiter }}
+{% endif %}
+{% if kdb.db_module_dir is defined %}
+	db_module_dir = {{ kdb.db_module_dir }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if krb_dbmodules is defined and krb_dbmodules | bool %}
+
+[dbmodules]
+{% for kr in krb_realms %}
+{% if kr.database_module is defined %}
+	{{ kr.database_module }} = {
+{% else %}
+	{{ kr.realm }} = {
+{% endif %}
+{% if kr.database_name is defined %}
+		database_name = {{ kr.database_name }}
+{% endif %}
+{% if kr.db_library is defined %}
+		db_library = {{ kr.db_library }}
+{% endif %}
+{% if kr.disable_last_success is defined %}
+		disable_last_success = {{ kr.disable_last_success }}
+{% endif %}
+{% if kr.disable_lockout is defined %}
+		disable_lockout = {{ kr.disable_lockout }}
+{% endif %}
+{% if kr.ldap_conns_per_server is defined %}
+		ldap_conns_per_server = {{ kr.ldap_conns_per_server }}
+{% endif %}
+{% if kr.ldap_kdc_dn is defined %}
+		ldap_kdc_dn = {{ kr.ldap_kdc_dn }}
+{% endif %}
+{% if kr.ldap_kadmind_dn is defined %}
+		ldap_kadmind_dn = {{ kr.ldap_kadmind_dn }}
+{% endif %}
+{% if kr.ldap_kdc_sasl_mech is defined %}
+		ldap_kdc_sasl_mech = {{ kr.ldap_kdc_sasl_mech }}
+{% endif %}
+{% if kr.ldap_kadmind_sasl_mech is defined %}
+		ldap_kadmind_sasl_mech = {{ kr.ldap_kadmind_sasl_mech }}
+{% endif %}
+{% if kr.ldap_kdc_sasl_authcid is defined %}
+		ldap_kdc_sasl_authcid = {{ kr.ldap_kdc_sasl_authcid }}
+{% endif %}
+{% if kr.ldap_kadmind_sasl_authcid is defined %}
+		ldap_kadmind_sasl_authcid = {{ kr.ldap_kadmind_sasl_authcid }}
+{% endif %}
+{% if kr.ldap_kdc_sasl_authzid is defined %}
+		ldap_kdc_sasl_authzid = {{ kr.ldap_kdc_sasl_authzid }}
+{% endif %}
+{% if kr.ldap_kadmind_sasl_authzid is defined %}
+		ldap_kadmind_sasl_authzid = {{ kr.ldap_kadmind_sasl_authzid }}
+{% endif %}
+{% if kr.ldap_kdc_sasl_realm is defined %}
+		ldap_kdc_sasl_realm = {{ kr.ldap_kdc_sasl_realm }}
+{% endif %}
+{% if kr.ldap_kadmind_sasl_realm is defined %}
+		ldap_kadmind_sasl_realm = {{ kr.ldap_kadmind_sasl_realm }}
+{% endif %}
+{% if kr.ldap_kerberos_container_dn is defined %}
+		ldap_kerberos_container_dn = {{ kr.ldap_kerberos_container_dn }}
+{% endif %}
+{% if kr.ldap_servers is defined %}
+		ldap_servers = {{ kr.ldap_servers }}
+{% endif %}
+{% if kr.ldap_service_password_file is defined %}
+		ldap_service_password_file = {{ kr.ldap_service_password_file }}
+{% endif %}
+{% if kr.mapsize is defined %}
+		mapsize = {{ kr.mapsize }}
+{% endif %}
+{% if kr.max_readers is defined %}
+		max_readers = {{ kr.max_readers }}
+{% endif %}
+{% if kr.nosync is defined %}
+		nosync = {{ kr.nosync }}
+{% endif %}
+{% if kr.unlockiter is defined %}
+		unlockiter = {{ kr.unlockiter }}
+{% endif %}
+{% if kr.db_module_dir is defined %}
+		db_module_dir = {{ kr.db_module_dir }}
+{% endif %}
+	}
+{% endfor %}
+{% endif %}
+
+[logging]
+{% for kl in krb_logging %}
+{% if kl.admin_server is defined %}
+	admin_server = {{ kl.admin_server }}
+{% endif %}
+{% if kl.kdc is defined %}
+	kdc = {{ kl.kdc }}
+{% endif %}
+{% if kl.default is defined %}
+	default = {{ kl.default }}
+{% endif %}
+{% if kl.debug is defined %}
+	debug = {{ kl.debug }}
+{% endif %}
+{% endfor %}
+{% if krb_otp is defined %}
+
+[otp]
+{% for ko in krb_otp %}
+	{{ ko.name }} = {
+{% if ko.server is defined %}
+		server = {{ ko.server }}
+{% endif %}
+{% if ko.secret is defined %}
+		secret = {{ ko.secret }}
+{% endif %}
+{% if ko.timeout is defined %}
+		timeout = {{ ko.timeout }}
+{% endif %}
+{% if ko.retries is defined %}
+		retries = {{ ko.retries }}
+{% endif %}
+{% if ko.strip_realm is defined %}
+		strip_realm = {{ ko.strip_realm }}
+{% endif %}
+{% if ko.indicator is defined %}
+		indicator = {{ ko.indicator }}
+{% endif %}
+	}
+{% endfor %}
+{% endif %}
