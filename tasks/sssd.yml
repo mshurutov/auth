@@ -1,5 +1,15 @@
 ---
 
+- name: set sssd_services from host, group, all groups and default values
+  set_fact:
+    sssd_services: "{{ sssd_services_default | community.general.lists_mergeby(sssd_services_group_all | default([]), sssd_services_group | default([]), sssd_services_host | default([]), 'name', recursive=true) }}"
+  tags: auth_mech_config,daemon_config,pam_config
+
+- name: set sssd_domains from group and default values
+  set_fact:
+    sssd_domains: "{{ sssd_domains_default | community.general.lists_mergeby(sssd_domains_group | default([]), 'name', recursive=true)}}"
+  tags: auth_mech_config,daemon_config,pam_config
+
 - name: copy sssd.conf to target host
   ansible.builtin.template:
     src: "{{ auth_templates_dir }}/sssd.conf.j2"
@@ -10,32 +20,35 @@
   notify:
     - enable sssd
     - restart sssd
-  tags: auth_mech_config
+  tags: auth_mech_config,daemon_config
 
 - name: delete LDAP support from /etc/pam.d/ files
   ansible.builtin.lineinfile:
     path: "/etc/pam.d/system-auth"
     regexp: ".*pam_ldap.*"
     state: absent
-  tags: auth_mech_config
+  tags: auth_mech_config,pam_config
 
 - name: delete Kerberos support from /etc/pam.d/ files
   ansible.builtin.lineinfile:
     path: "/etc/pam.d/system-auth"
     regexp: ".*pam_krb5.*"
     state: absent
-  tags: auth_mech_config
+  tags: auth_mech_config,pam_config
+
+- name: delete exist sss support from /etc/pam.d/ files
+  ansible.builtin.lineinfile:
+    path: "/etc/pam.d/system-auth"
+    regexp: ".*pam_sss.*"
+    state: absent
+  tags: auth_mech_config,pam_config
 
 - name: edit /etc/pam.d/system-auth
   ansible.builtin.lineinfile:
     path: "/etc/pam.d/system-auth"
     line: "{{ item.line }}"
     insertbefore: "{{ item.regexp }}"
-  tags: auth_mech_config
-  loop:
-    - { regexp: "^auth.*pam_unix.so.*nullok", line: "auth\t\tsufficient\tpam_sss.so use_first_pass" }
-    - { regexp: "^account.*pam_unix.so.*", line: "account\t\tsufficient\tpam_sss.so" }
-    - { regexp: "^password.*pam_unix.so.*", line: "password\t\tsufficient\tpam_sss.so" }
-    - { regexp: "^session.*pam_unix.so.*", line: "session\t\tsufficient\tpam_sss.so" }
+  loop: "{{ sss_pam_settings }}"
+  tags: auth_mech_config,pam_config
 
 

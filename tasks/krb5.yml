@@ -1,10 +1,5 @@
 ---
 
-- name: load OS-specific variables
-  ansible.builtin.include_vars:
-    file: "{{ auth_vars_dir }}/{{ ansible_os_family }}.yml"
-  tags: krb_install
-
 - name: create /etc/krb5.conf
   ansible.builtin.template:
     src: "{{ auth_templates_dir }}/krb5.conf.j2"
@@ -86,10 +81,19 @@
       loop_control:
         loop_var: user
       tags: krb_add_principals
-    - name: create principals in ldap for exist hosts
+    - name: create principals in ldap for exist host namess
       ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ host.value.dn }}\" host/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
       when: host.key not in list_principals.stdout
       loop: "{{  lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+      loop_control:
+        loop_var: host
+      tags: krb_add_principals
+    - name: create principals in ldap for exist host IP-adresses
+      community.general.ldap_attrs:
+        dn: "{{ host.0.value.dn }}"
+        attributes:
+          krbPrincipalName: "host/{{ host.1 }}@{{ krb_default_realm }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
       loop_control:
         loop_var: host
       tags: krb_add_principals

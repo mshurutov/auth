@@ -1,6 +1,6 @@
 ---
 
-- name: install auth services`
+- name: install auth services
   ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
   tags: auth_install
 
@@ -20,7 +20,7 @@
   when: ! stat_ssl_ca.stat.exists
   tags: auth_ssl
 
-- name: setup server
+- name: setup LDAP server
   ansible.builtin.import_tasks: ldap_server.yml
   when: ldap_is_server is defined and ldap_is_server | bool
   tags: ldap_server_config
@@ -43,15 +43,15 @@
     group: 'root'
     mode: '0600'
     create: true
-  loop: "{{ ldap_conf_params | ansible.builtin.combine(ldap_user_conf_params) | dict2items }}"
+  loop: "{{ ldap_conf_params | ansible.builtin.combine(ldap_user_conf_params | default({})) | dict2items }}"
   tags: ldap_client_config
 
-- name: configure auth service if auth_type is not ldap
+- name: configure auth service if auth_type is not ldap (default krb5)
   ansible.builtin.include_tasks: "{{ auth_type }}.yml" 
   when: auth_type != "ldap"
   tags: auth_service_setup
 
-- name: configure auth mech if auth_mech is not ldap
+- name: configure auth mech if auth_mech is not ldap (default sssd)
   ansible.builtin.include_tasks: "{{ auth_mech }}.yml" 
   when: auth_mech != "ldap"
   tags: auth_mech_setup
@@ -60,7 +60,7 @@
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "{{ item }}"
-    line: '\1:\2{{ auth_mech }} \3'
+    line: '\1:\2{{ auth_mech | regex_replace("sssd","sss") }} \3'
     state: present
     backrefs: yes
   loop:
@@ -73,7 +73,7 @@
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "^ *#? *sudoers"
-    line: "sudoers:    ldap files"
+    line: "sudoers:    {{ auth_mech | regex_replace(\"sssd\",\"sss\") }} files"
     state: present
   when: ldap_sudo is defined
   tags: ldap_client_config,ldap_setup_sudo

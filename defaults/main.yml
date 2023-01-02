@@ -164,13 +164,29 @@ krb_logging:
 #      value: value2
 
 # Settings for sssd service
-sssd_services_list: "nss,pam"
-sssd_default_domain_id_provider: "ldap"
-sssd_default_domain_auth_provider: "krb5"
+sssd_default_services_list: "nss,pam"
+sssd_domains_default:
+  - name: "{{ common_domain_name }}"
+    options:
+      id_provider: "ldap"
+      auth_provider: "krb5" 
+      selinux_provider: "none"
+      ldap_search_base: "{{ ldap_base_suffix }}"
+      ldap_default_bind_dn: "{{ ldap_rootdn }}"
+      ldap_default_authtok_type: "password"
+      ldap_default_authtok: "{{ ldap_root_password }}"
+      ldap_tls_cacert: "{{ common_ssl_CA }}"
+      ldap_id_use_start_tls: true
+      ldap_schema: "rfc2307bis"
+      krb5_realm: "{{ krb_default_realm }}"
+      cache_credentials: true
 sssd_services_default:
   - name: "nss"
     options:
-      - filter_users: "adm,bin,daemon,root"
+      filter_users: "adm,bin,daemon,root"
   - name: "pam"
-  - name: "sudo"
-  - name: "ssh"
+sss_pam_settings:
+    - { regexp: "^auth.*pam_unix.so.*nullok", line: "auth\t\tsufficient\tpam_sss.so" }
+    - { regexp: "^account.*pam_unix.so.*", line: "account\t\tsufficient\tpam_sss.so" }
+    - { regexp: "^password.*pam_unix.so.*", line: "password\tsufficient\tpam_sss.so use_authtok" }
+    - { regexp: "^session.*pam_unix.so.*", line: "session\t\tsufficient\tpam_sss.so" }
