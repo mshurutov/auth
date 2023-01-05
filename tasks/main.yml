@@ -43,7 +43,7 @@
     group: 'root'
     mode: '0600'
     create: true
-  loop: "{{ ldap_conf_params | ansible.builtin.combine(ldap_user_conf_params | default({})) | dict2items }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
 - name: configure auth service if auth_type is not ldap (default krb5)
