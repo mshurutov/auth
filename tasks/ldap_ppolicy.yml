@@ -12,7 +12,7 @@
   community.general.ldap_attrs:
     dn: "cn=config"
     attributes:
-      olcPasswordCryptSaltFormat: '$6$%.16s'
+      olcPasswordCryptSaltFormat: "{{ ldap_password_crypt_format }}"
     state: 'exact' # without this line I get error "ldap.INAPPROPRIATE_MATCHING"
   when: ldap_pass_enc_func == '{CRYPT}'
   tags: ldap_setup_ppolicy
@@ -45,6 +45,7 @@
       olcPPolicyHashCleartext: "{{ lppo.attrs.olcPPolicyHashCleartext | default(omit) }}"
       olcPPolicyUseLockout: "{{ lppo.attrs.olcPPolicyUseLockout | default(omit) }}"
       olcPPolicyForwardUpdates: "{{ lppo.attrs.olcPPolicyForwardUpdates | default(omit) }}"
+      pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
   when: lppo_exists.stdout == ""
   tags: ldap_setup_ppolicy
 
@@ -60,7 +61,6 @@
       sn: "ppolicy"
       pwdAttribute: "{{ lppp.attrs.pwdAttribute | default('userPassword') }}"
   tags: ldap_setup_ppolicy
-  when: common_hostname == common_primary_dc
 
 - name: add ppolicy attrs
   community.general.ldap_attrs:
@@ -80,7 +80,22 @@
       pwdMustChange: "{{ lppp.attrs.pwdMustChange | default(omit) }}"
       pwdAllowUserChange: "{{ lppp.attrs.pwdAllowUserChange | default(omit) }}"
       pwdSafeModify: "{{ lppp.attrs.pwdSafeModify | default(omit) }}"
-      pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
   tags: ldap_setup_ppolicy
-  when: common_hostname == common_primary_dc
-      
+
+- name: set pwdCheckModule
+  block:
+    - name: set pwdCheckModule prior 2.6 version
+      community.general.ldap_attrs:
+        dn: "{{ lppp.dn }}"
+        attributes:
+          pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
+      when: ldap_version <= 2.5
+      tags: ldap_setup_ppolicy
+    - name: set pwdCheckModule since 2.6 version
+      community.general.ldap_attrs:
+        dn: "{{ lppo.dn }}"
+        attributes:
+          pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
+      when: ldap_version > 2.5
+      tags: ldap_setup_ppolicy
+

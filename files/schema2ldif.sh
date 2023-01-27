@@ -48,6 +48,7 @@ echo "$0: converting $schemaFile to LDIF $localdir/$targetFile"
 echo "$0: Create temp dir and config file"
 tmpDir=$(mktemp -d)
 cd "$tmpDir"
+mkdir ldap
 touch tmp.conf
 for dependency in $dependencies; do
 	echo "include $dependency" >> tmp.conf
@@ -55,8 +56,8 @@ done
 echo "include $schemaFile" >> tmp.conf
 
 echo "$0: convert, rename and sanitize"
-$slaptest -f tmp.conf -F "$tmpDir" || print_help $badconvert "convert is failed"
-cd cn\=config/cn\=schema
+$slaptest -f tmp.conf -F "$tmpDir/ldap" || print_help $BADCONVERT "convert is failed"
+cd ldap/cn\=config/cn\=schema
 filenametmp=$(echo cn\=*"$targetFile")
 
 sed -r \

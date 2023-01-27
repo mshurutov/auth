@@ -156,12 +156,22 @@
 # fatal: [desktop]: FAILED! => {"changed": false, "details": "{'msgtype': 103, 'msgid': 3, 'result': 21, 'desc': 'Invalid syntax', 'ctrls': [], 'info': 'olcMirrorMode: value #0 invalid per syntax'}", "msg": "Attribute action failed."}
 # if ldap_mirror_mode is not one from two STRINGS: "TRUE" or "FALSE"
 # False, True, true as ansible bool value cause error above
+- name: add olcMultiProvider
+  community.general.ldap_attrs:
+    dn: "{{ ldap_db_dn }}"
+    attributes:
+      olcMultiProvider: "{{ ldap_mirror_mode }}"
+    state: exact
+  when: ldap_version > 2.4
+  tags: ldap_setup_syncprov,ldap_config_syncprov
+
 - name: add MirrorMode
   community.general.ldap_attrs:
     dn: "{{ ldap_db_dn }}"
     attributes:
       olcMirrorMode: "{{ ldap_mirror_mode }}"
     state: exact
+  when: ldap_version == 2.4
   tags: ldap_setup_syncprov,ldap_config_syncprov
 
 - name: add indexes for replication

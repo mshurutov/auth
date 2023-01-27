@@ -19,8 +19,10 @@ auth_packages:
   - "sys-auth/pam_krb5"
 slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
 # Files and directories
+ldap_version: "2.4"
 ldap_config_dir: "/etc/openldap"
 ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
+ldap_keytab_file: "{{ ldap_config_dir }}/ldap.keytab"
 ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
 ldap_ssl_dir: "{{ ldap_config_dir }}/ssl"
 ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ ansible_hostname }}.{{ common_domain_name }}-private.key"
@@ -34,15 +36,20 @@ ldap_system_group: "ldap"
 # Connection info: ports
 ldap_port: 389
 ldap_ssl_port: 686
-# Config parameters for files
-ldap_slapd_urls_regexp: "^Environment=.*"
-ldap_slapd_urls: 'Environment="SLAPD_URLS=ldaps:/// ldapi:///"'
+# Parameters for unit file
+ldap_unit_params:
+  - regexp: '^#?\s*(Environment.*-f.*)' # check if config file is disabled
+    line: '#\1'
+  - regexp: '^#?\s*(Environment.*-F[^"]*")' # check if OLC is enabled
+    line: '\1'
+  - regexp: '^Environment=.*SLAPD_URLS'
+    line: 'Environment="SLAPD_URLS=ldaps:/// ldapi:///"' # disable unencrypted connect
 
 # LDAP settings for service (OLC-way)
 # modules
 ldap_default_modules:
   - "back_mdb.so"
-# schemas
+# schemas for include
 ldap_default_schemas:
   - "core"
   - "cosine"
@@ -69,9 +76,8 @@ ldap_server_uri: "ldapi:///"
 ldap_conf_params:
   BASE: "{{ ldap_base_suffix }}"
   URI: "ldap://{{ ansible_hostname }}"
-#ldap_user_conf_params:
-#  BINDDN: "{{ ldap_reader_dn }}"
-#  BINDPW: "base64:{{ ldap_reader_password | string | b64encode }}"
+ldap_pass_enc_func: "{CRYPT}"
+ldap_password_crypt_format: "$6$%.16s"
 ldap_ops_group: "cn=ops,ou=groups,{{ ldap_base_suffix }}"
 ldap_bs_acl:
   - '{0}to attrs=userPassword
@@ -116,7 +122,6 @@ krb_common_config: "/etc/krb5.conf"
 krb_kdc_port: 88
 krb_kadmin_port: 749
 krb_pwd_port: 464
-
 # common config parameters
 krb_krb5_db_type: "klmdb"
 krb_default_realm: "{{ common_domain_name | upper }}"
@@ -172,9 +177,6 @@ sssd_domains_default:
       auth_provider: "krb5" 
       selinux_provider: "none"
       ldap_search_base: "{{ ldap_base_suffix }}"
-      ldap_default_bind_dn: "{{ ldap_rootdn }}"
-      ldap_default_authtok_type: "password"
-      ldap_default_authtok: "{{ ldap_root_password }}"
       ldap_tls_cacert: "{{ common_ssl_CA }}"
       ldap_id_use_start_tls: true
       ldap_schema: "rfc2307bis"

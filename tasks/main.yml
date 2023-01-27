@@ -22,7 +22,7 @@
 
 - name: setup LDAP server
   ansible.builtin.import_tasks: ldap_server.yml
-  when: ldap_is_server is defined and ldap_is_server | bool
+  when: ldap_servers_group in group_names
   tags: ldap_server_config
 
 - name: edit {{ ldap_config_dir }}/ldap.conf (system config)

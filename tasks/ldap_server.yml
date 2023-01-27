@@ -4,6 +4,7 @@
 ## Process of init is: stop slapd if started; delete config and db dirs;
 ## copy schemas *.ldif into server; create tmpdir; copy template of init.ldif to created dir
 ## create config and db dirs; init ldap service by exec command slapadd
+## there is "ldap_init_force" shoul be defined as true for this set of tasks
 - name: init openldap service 
   block:
 ## Stop slapd service
@@ -26,7 +27,7 @@
       ansible.builtin.copy:
         src: "{{ item }}"
         dest: "{{ ldap_config_schema_dir }}/"
-      loop: "{{ lookup('ansible.builtin.fileglob', ldap_files_dir + '/*.ldif', wantlist=True) }}"
+      loop: "{{ lookup('ansible.builtin.fileglob', auth_files_dir + '/*.ldif', wantlist=True) }}"
       tags: ldap_init
 ## Create temp dir
     - name: check if /tmp/openldap/ exists on target host
@@ -73,8 +74,26 @@
         recurse: yes
         state: directory
       tags: ldap_init
+# Edit unit file
+    - name: Edit unit file
+      ansible.builtin.lineinfile:
+        path: "{{ slapd_service_file }}"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        backrefs: yes
+        state: present
+      loop: "{{ ldap_unit_params }}"
+      tags: ldap_init
+# After edit unit file there is need to reload unit files and restart slapd
+    - name: daemon reload after change unit
+      ansible.builtin.systemd:
+        name: slapd.service
+        daemon_reload: yes
+      when: ansible_service_mgr == 'systemd'
+      tags: ldap_init
   when: ldap_init_force is defined and ldap_init_force | bool
 
+## Other tasks don't need init mode (ldap_init_force)
 - name: copy schema2ldif.sh to target host
   ansible.builtin.copy:
     src: "{{ auth_files_dir }}/schema2ldif.sh"
@@ -83,13 +102,7 @@
     group: 'root'
     mode: 0755
   tags: ldap_setup,ldap_schema_ldif
-
-- name: check if {{ ldap_tmp_ldif }} exists
-  ansible.builtin.file:
-    path: "{{ ldap_tmp_ldif }}"
-    state: 'absent'
-  tags: ldap_setup,ldap_schema_dir
-
+# 
 - name: convert schema files to ldif
   become: yes
   become_user: root
@@ -103,8 +116,7 @@
       - "{{ ldap_config_schema_dir }}/inetorgperson.schema"
   loop: "{{ ldap_schema_only }}"
   tags: ldap_setup,ldap_schema_ldif
-
-# All follow tasks need slapd is started
+# Every follow logical block need slapd is started
 - name: start openldap service
   ansible.builtin.service:
     name: slapd
@@ -112,7 +124,9 @@
   notify:
     - enable slapd
   tags: ldap_setup,ldap_start,ldap_setup_overlays
-
+# First there is need SSL only connect from network
+# So, add this thing
+# Create dir for SSL keys/csr/cert
 - name: check if ssl dir is exist
   file:
     path: "{{ ldap_ssl_dir }}"
@@ -121,7 +135,7 @@
     group: "{{ ldap_system_group }}"
     mode: 0755
   tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
-
+# Create SSL private key
 - name: create private key for LDAP SSL
   community.crypto.openssl_privatekey:
     path: "{{ ldap_ssl_pkey }}"
@@ -129,7 +143,7 @@
     group: "{{ ldap_system_group }}"
     mode: 0600
   tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
-
+# Create CSR (Certificate Signing Request)
 - name: create Certificate Signing Request for LDAP SSL
   community.crypto.openssl_csr:
     path: "{{ ldap_ssl_csr }}"
@@ -144,7 +158,7 @@
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
   tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
-
+# Create cert
 - name: create certificate for LDAP SSL
   community.crypto.x509_certificate:
     path: "{{ ldap_ssl_cert }}"
@@ -156,9 +170,10 @@
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
   tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
-
+# Add SSL support into slapd config
 - name: add SSL support
   community.general.ldap_attrs:
+    validate_certs: "false"
     dn: "cn=config"
     state: exact
     attributes:
@@ -168,22 +183,7 @@
       olcTLSCACertificateFile: "{{ common_ssl_CA }}"
   tags: ldap_setup_tree,ldap_ssl,ldap_ssl_config
 
-- name: configure slapd for SSL network connection only
-  ansible.builtin.lineinfile:
-    path: "{{ slapd_service_file }}"
-    regexp: "{{ ldap_slapd_urls_regexp }}"
-    line: "{{ ldap_slapd_urls }}"
-    state: present
-  tags: ldap_setup_tree,ldap_ssl,ldap_set_ssl_only
-
-- name: daemon reload after change unit
-  ansible.builtin.systemd:
-    name: slapd.service
-    daemon_reload: yes
-  notify: restart slapd
-  when: ansible_service_mgr == 'systemd'
-  tags: ldap_setup_tree,ldap_ssl
-
+# Operation of add module crashes if module is loaded yet
 - name: Load any additional modules
   block:
     - name: get list of loaded modules
@@ -205,6 +205,7 @@
       when: not item in loaded_modules.stdout
   when: ldap_ext_modules is defined
 
+# Operation of add schema crashes if schema is added yet
 - name: Load any additional schemas
   block:
     - name: get list of loaded schemas
@@ -221,7 +222,8 @@
       tags: ldap_setup,ldap_setup_add_schemas
   when: ldap_ext_schemas is defined
 
-- name: add tree objects on primary_dc
+# Add Organization and Organizational Units before add overlays, because any overlays requare OU for it
+- name: add base objects on primary_dc
   block: 
     - name: add Organization into LDAP
       community.general.ldap_entry:
@@ -233,7 +235,7 @@
           o: "{{ ldap_organization_name }}"
           dc: "{{ ldap_base_name }}"
           description: "{{ ldap_organization_desc }}"
-      tags: ldap_setup_tree,ldap_setup_o
+      tags: ldap_setup_tree,ldap_setup_o,ldap_setup_bs_ous
     - name: add organizational units
       community.general.ldap_entry:
         dn: "{{ item.dn }}"
@@ -243,6 +245,17 @@
           description: "{{ item.description }}"
       loop: "{{ [ldap_default_ous,ldap_ext_ous] | community.general.lists_mergeby('ou') }}"
       tags: ldap_setup_tree,ldap_setup_bs_ous
+#  when: common_hostname == common_primary_dc
+
+# MemberOf overlay should be added before adding groups but after its OU
+- name: add overlays
+  ansible.builtin.include_tasks: "{{ item.key }}.yml"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_overlays, wantlist=True) }}"
+  when: ldap_overlays is defined
+  tags: ldap_setup,ldap_setup_overlays
+
+- name: add additional objects on primary_dc
+  block: 
     - name: add Kerberos support
       block:
         - name: add Kerberos Container
@@ -250,21 +263,24 @@
             dn: "{{ ldap_krb_pack }}"
             objectClass:
               - "krbContainer"
+          tags: ldap_setup_tree,ldap_setup_krb
         - name: get max number of ACL
           ansible.builtin.shell: ldapsearch -QLLLY EXTERNAL -H ldapi:/// -b olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config | awk '/^olcAccess/ {a=gensub(/.*\{([0-9]+)\}.*/,"\\1","g",$0); if ( a > b ) b=a; } END { print b }'
           register: acl_max_number
           check_mode: no
+          tags: ldap_setup_tree,ldap_setup_krb
         - name: check if ACL exists
           ansible.builtin.shell: "ldapsearch -QLLLY EXTERNAL -H ldapi:/// -b olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config | awk '/to dn.subtree=\"cn=kerberos,ou=baseservices,dc=mshurutov,dc=home\"/ {print}'"
           register: acl_exist
           check_mode: no
+          tags: ldap_setup_tree,ldap_setup_krb
         - name: add access rights to Kerberos container
           community.general.ldap_attrs:
             dn: "{{ ldap_db_dn }}"
             attributes:
               olcAccess: "{{ '{' }}{{ acl_max_number.stdout | int + 1 }}{{ '}' }}to dn.subtree=\"{{ ldap_krb_pack }}\" by group.exact=\"{{ ldap_ops_group }}\" manage by group.exact=\"{{ ldap_krb_group }}\" manage by * none"
           when: acl_exist.stdout == ""
-      tags: ldap_setup_tree,ldap_setup_krb
+          tags: ldap_setup_tree,ldap_setup_krb
       when: auth_type == "krb5"
     - name: add sudo over ldap support
       block:
@@ -310,7 +326,7 @@
           sn: "{{ item.key }}"
           uid: "{{ item.key }}"
           uidNumber: "{{ item.value.uidNumber }}"
-          gidNumber: "{{ item.value.gidNumber }}"
+          gidNumber: "{{ item.value.uidNumber }}"
           homeDirectory: "{{ ldap_home_root }}/{{ item.key }}"
           loginShell: "{{ item.value.loginShell | default(ldap_loginshell) }}"
           mail: "{{ item.value.mail }}"
@@ -321,6 +337,9 @@
         dn: "{{ item.value.dn }}"
         state: exact
         attributes:
+          uidNumber: "{{ item.value.uidNumber }}"
+          gidNumber: "{{ item.value.uidNumber }}"
+          loginShell: "{{ item.value.loginShell | default(ldap_loginshell) }}"
           gecos: "{{ item.value.gecos | default(omit) }}"
           description: "{{ item.value.description | default(omit) }}"
           shadowLastChange: "{{ item.value.shadowLastChange | default(omit) }}"
@@ -353,10 +372,6 @@
           preferredLanguage: "{{ item.value.preferredLanguage | default(omit) }}"
           userSMIMECertificate: "{{ item.value.userSMIMECertificate | default(omit) }}"
           userPKCS12: "{{ item.value.userPKCS12 | default(omit) }}"
-          seeAlso: "{{ item.value.seeAlso | default(omit) }}"
-          localityName: "{{ item.value.localityName | default(omit) }}"
-          organizationalUnitName: "{{ item.value.organizationalUnitName | default(omit) }}"
-          host: "{{ item.value.host | default(omit) }}"
       loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
       tags: ldap_setup_tree,ldap_users
     - name: add password for every user
@@ -396,6 +411,28 @@
           mobile:  "{{ item.1 | default(omit) }}"
       loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mobile',skip_missing=True) }}"
       tags: ldap_setup_tree,ldap_users,ldap_users_mobile
+    - name: add primary group for users
+      community.general.ldap_entry:
+        dn: "uid={{ item.key }},{{ ldap_groups_ou }}"
+        objectClass:
+          - "posixGroup"
+          - "account"
+        attributes:
+          uid: "{{ item.key }}"
+          memberUid: "{{ item.value.uidNumber }}"
+          gidNumber: "{{ item.value.uidNumber }}"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+      tags: ldap_setup_tree,ldap_users
+    - name: add additional attributes for account groups
+      community.general.ldap_attrs:
+        dn: "uid={{ item.0.key }},{{ ldap_groups_ou }}"
+        attributes:
+          seeAlso: "{{ item.0.value.seeAlso | default(omit) }}"
+          localityName: "{{ item.0.value.localityName | default(omit) }}"
+          organizationalUnitName: "{{ item.0.value.organizationalUnitName | default(omit) }}"
+          host: "{{ item.1 | default(omit) }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.host',skip_missing=True) }}"
+      tags: ldap_setup_tree,ldap_users
     - name: add ssh-keys support
       block:
         - name: add sshkeys objectclass for user
@@ -450,11 +487,23 @@
           ipHostNumber: "{{ item.1 }}"
       loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
       tags: ldap_setup_tree,ldap_hosts
+    - name: add services into LDAP DIT
+      community.general.ldap_entry:
+        dn: "{{ item.value.dn }}"
+        objectClass:
+          - "account"
+        attributes:
+          uid: "{{ item.key }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) }}"
+      when: ldap_services is defined
+      tags: ldap_setup_tree,ldap_services
+    - name: add hosts addresses for services
+      community.general.ldap_attrs:
+        dn: "{{ item.0.value.dn }}"
+        attributes:
+          host: "{{ item.1 }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) | subelements('value.host') }}"
+      when: ldap_services is defined
+      tags: ldap_setup_tree,ldap_services
   when: common_hostname == common_primary_dc
-
-- name: add overlays
-  ansible.builtin.include_tasks: "{{ item.key }}.yml"
-  loop: "{{  lookup('ansible.builtin.dict', ldap_overlays, wantlist=True) }}"
-  when: ldap_overlays is defined
-  tags: ldap_setup,ldap_setup_overlays
 
