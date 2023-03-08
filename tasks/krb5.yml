@@ -184,11 +184,11 @@
       delegate_to: 127.0.0.1
       tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
     - name: create host keytabs on primary KDC with key for FQDN
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ item }}.keytab host/{{ item }}.{{ common_domain_name }}"
+      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars['item']['common_short_hostname'] }}.keytab host/{{ common_full_hostname }}"
       loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
       tags: krb_client_config,krb_ktb4hosts
     - name: add host key for short name nto keytab on primary KDC
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ item }}.keytab host/{{ item }}"
+      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars['item']['common_short_name'] }}.keytab host/{{ item }}"
       loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
       tags: krb_client_config,krb_ktb4hosts
     - name: create service keytabs on primary KDC

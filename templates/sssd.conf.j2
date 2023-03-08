@@ -79,7 +79,7 @@ domain_resolution_order = {{ sssd_domain_resolution_order }}
 {% for key,value in dmn.options.items() %}
 {{ key }} = {{ value }}
 {% if key == "id_provider" and value == "ldap" %}
-ldap_uri = {% for ldap_host in groups[ldap_ansible_group] %}ldaps://{{ hostvars[ldap_host]['ansible_host']}}{% if not loop.last %},{% endif %}{% endfor %}
+ldap_uri = {% for ldap_host in groups[ldap_ansible_group] %}ldaps://{{ hostvars[ldap_host]['common_full_hostname']}}{% if not loop.last %},{% endif %}{% endfor %}
 
 {% endif %}
 {% if key == "auth_provider" and value == "krb5" %}
