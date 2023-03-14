@@ -7,16 +7,17 @@ auth_templates_dir: "{{ role_path }}/templates"
 auth_files_dir: "{{ role_path }}/files"
 auth_vars_dir: "{{ role_path }}/vars"
 auth_admin_path: "/usr/loca/sbin"
-# System settings for ldap part: files and dirs, system users and groups, connection info etc
 # settings for install need services (default distro - Gentoo)
-auth_packages:
-  - "openldap"
-  - "python-ldap"
+auth_packages: "auth_{{ ansible_pkg_mgr }}_packages"
+auth_portage_packages: 
+  - "net-nds/openldap"
+  - "dev-python/python-ldap"
   - "dev-python/cryptography"
   - "sys-auth/sssd"
   - "app-crypt/mit-krb5"
   - "dev-tcltk/expect"
   - "sys-auth/pam_krb5"
+# System settings for ldap part: files and dirs, system users and groups, connection info etc
 slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
 # Files and directories
 ldap_version: "2.4"
