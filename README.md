@@ -43,7 +43,7 @@ Including an example of how to use your role (for instance, with variables passe
 License
 -------
 
-[GPLv2]: https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+[GPLv2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt)
 
 Author Information
 ------------------
