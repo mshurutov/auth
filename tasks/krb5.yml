@@ -1,5 +1,6 @@
 ---
 
+#=====  Main config file for clients =====
 - name: create /etc/krb5.conf
   ansible.builtin.template:
     src: "{{ auth_templates_dir }}/krb5.conf.j2"
@@ -8,228 +9,319 @@
     group: "root"
   tags: krb_config,krb_client_config,krb_common_config
 
+#===== Server configuration: BEGIN =====
 - name: create server configs
   block:
-    - name: copy script for create stash file to target host
-      ansible.builtin.template:
-        src: "{{ item }}"
-        dest: "/root/{{ item | basename | regex_replace('.j2') }}"
-        owner: "root"
-        group: "root"
-        mode: 0700
-      with_fileglob:
-        - "{{ auth_templates_dir }}/krb*.sh.j2"
-      tags: krb_config,krb_kdc_config
-    - name: create stashe file
-      ansible.builtin.command: "/root/krb_stash.sh {{ ldap_krb_admin }} {{ ldap_krb_admin_password}}"
-      tags: krb_config,krb_kdc_config
-    - name: create {{ krb_kdc_config }}
-      ansible.builtin.template:
-        src: "{{ auth_templates_dir }}/kdc.conf.j2"
-        dest: "{{ krb_kdc_config }}"
-        owner: "root"
-        group: "root"
-      tags: krb_config,krb_kdc_config
-    - name: create {{ krb_acl_config }}
-      ansible.builtin.lineinfile:
-        path: "{{ krb_acl_config  }}"
-        line: "{{ item }}"
-        state: present
-        create: true
-      loop: "{{ krb_db_acls | default([]) }}"
-      when: krb_db_acls is defined
-      tags: krb_config,krb_kdc_config
-    - name: create Kerberos structure in LDAP
-      ansible.builtin.command: "kdb5_ldap_util create {% if krb_subtrees is defined %}-subtrees \"{{ krb_subtrees }}\"{% endif %} -P {{ ldap_krb_admin_password }} -r {{ krb_default_realm }}"
-      tags: krb_config,krb_init_ldap
-      when: common_hostname == common_primary_dc and krb_krb5_db_type == "kldap" and krb_init_force is defined and krb_init_force | bool
-    - name: check if master key is not exist
-      ansible.builtin.file:
-        path: "{{ krb_krb5_db_path }}/.k5.{{ krb_default_realm }}"
-        state: absent
-      when: common_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
-      tags: krb_config,krb_kdc_config
-    - name: create master key on other hosts
-      ansible.builtin.command: "/root/krb_mk.sh {{ ldap_krb_admin_password}}"
-      when: common_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
-      tags: krb_config,krb_kdc_config
-    - name: restart kdc
-      ansible.builtin.service:
-        name: mit-krb5kdc
-        state: restarted
-      tags: krb_config,krb_init_ldap
-      when: krb_init_force is defined and krb_init_force | bool
-    - name: restart kadmind
-      ansible.builtin.service:
-        name: mit-krb5kadmind
-        state: restarted
-      tags: krb_config,krb_init_ldap
-      when: krb_init_force is defined and krb_init_force | bool
+# Stash file: script for create it
+  - name: copy script for create stash file to target host
+    ansible.builtin.template:
+      src: "{{ item }}"
+      dest: "/root/{{ item | basename | regex_replace('.j2') }}"
+      owner: "root"
+      group: "root"
+      mode: 0700
+    with_fileglob:
+      - "{{ auth_templates_dir }}/krb*.sh.j2"
+    tags: krb_config,krb_kdc_config
+# Stash file: create it
+  - name: create stashe file
+    ansible.builtin.command: "/root/krb_stash.sh {{ ldap_krb_admin }} {{ ldap_krb_admin_password}}"
+    tags: krb_config,krb_kdc_config
+# KDC configuration file
+  - name: create {{ krb_kdc_config }}
+    ansible.builtin.template:
+      src: "{{ auth_templates_dir }}/kdc.conf.j2"
+      dest: "{{ krb_kdc_config }}"
+      owner: "root"
+      group: "root"
+    tags: krb_config,krb_kdc_config
+# ACL database (file?! WTF?!)
+  - name: create {{ krb_acl_config }}
+    ansible.builtin.lineinfile:
+      path: "{{ krb_acl_config  }}"
+      line: "{{ item }}"
+      state: present
+      create: true
+    loop: "{{ krb_db_acls | default([]) }}"
+    when: krb_db_acls is defined
+    tags: krb_config,krb_kdc_config
+# Add KRB5 structures in LDAP
+  - name: create Kerberos structure in LDAP
+    ansible.builtin.command: "kdb5_ldap_util create {% if krb_subtrees is defined %}-subtrees \"{{ krb_subtrees }}\"{% endif %} -P {{ ldap_krb_admin_password }} -r {{ krb_default_realm }}"
+    tags: krb_config,krb_init_ldap
+    when: common_full_hostname == common_primary_dc and krb_krb5_db_type == "kldap" and krb_init_force is defined and krb_init_force | bool
+#===== Mater-key file =====
+# on primary KDC
+  - name: check if master key is not exist
+    ansible.builtin.file:
+      path: "{{ krb_krb5_db_path }}/.k5.{{ krb_default_realm }}"
+      state: absent
+    when: common_full_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
+    tags: krb_config,krb_kdc_config
+# on other KDC
+  - name: create master key on other hosts
+    ansible.builtin.command: "/root/krb_mk.sh {{ ldap_krb_admin_password}}"
+    when: common_full_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
+    tags: krb_config,krb_kdc_config
+#=====  (Re)start KRB5 services =====
+# KDC
+  - name: restart kdc
+    ansible.builtin.service:
+      name: "{{ krb_kdc_service }}"
+      state: restarted
+    tags: krb_config,krb_init_ldap
+    when: krb_init_force is defined and krb_init_force | bool
+# KADMIN
+  - name: restart kadmind
+    ansible.builtin.service:
+      name: "{{ krb_kadmin_service }}" 
+      state: restarted
+    tags: krb_config,krb_init_ldap
+    when: krb_init_force is defined and krb_init_force | bool
   when: krb_servers_group in group_names
-#  when: krb_is_server is defined and krb_is_server | bool
+#===== Server configuration: END =====
 
+#===== Principals: BEGIN =====
 - name: create principals
   block:
-    - name: get list of principals
-      ansible.builtin.command: "kadmin.local list_principals"
-      check_mode: no
-      register: list_principals
-      tags: krb_add_principals,krb_add_principals_users,krb_add_principals_hosts,krb_add_principals_services
-    - name: create principals in ldap for exist users
-      ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ user.value.dn }}\" {{ user.key }}@{{ krb_default_realm }}"
-      when: user.key not in list_principals.stdout
-      loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
-      loop_control:
-        loop_var: user
-      tags: krb_add_principals,krb_add_principals_users
-    - name: create principals in ldap for exist host names
-      ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ host.value.dn }}\" host/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
-      when: host.key not in list_principals.stdout
-      loop: "{{  lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+# List of exist principals
+  - name: get list of principals
+    ansible.builtin.command: "kadmin.local list_principals"
+    check_mode: no
+    register: list_principals
+    tags: krb_add_principals,krb_add_principals_users,krb_add_principals_hosts,krb_add_principals_services
+# Users principals
+  - name: create principals in ldap for exist users
+    ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ user.value.dn }}\" {{ user.key }}@{{ krb_default_realm }}"
+    when: user.key not in list_principals.stdout
+    loop: "{{  lookup('ansible.builtin.dict', ldap_users| ansible.builtin.combine(ldap_system_users,list_merge='append_rp',recursive='true'), wantlist=True) }}"
+    loop_control:
+      loop_var: user
+    tags: krb_add_principals,krb_add_principals_users
+# Host: FQDN principals
+  - name: create principals in ldap for exist host names
+    ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ host.value.dn }}\" host/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
+    when: host.key not in list_principals.stdout
+    loop: "{{  lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+    loop_control:
+      loop_var: host
+    tags: krb_add_principals,krb_add_principals_hosts
+# Host: IP_addresses principals
+  - name: create principals in ldap for exist host IP-adresses
+    community.general.ldap_attrs:
+      dn: "{{ host.0.value.dn }}"
+      attributes:
+        krbPrincipalName: "host/{{ host.1 }}@{{ krb_default_realm }}"
+    loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
+    loop_control:
+      loop_var: host
+    tags: krb_add_principals,krb_add_principals_hosts
+# Host: NFS principals
+  - name: create NFS principals
+    block:
+# Host: NFS principal for FQDN
+    - name: create NFS principals in ldap for full hostname
+      community.general.ldap_attrs:
+        dn: "{{ host.value.dn }}"
+        attributes:
+          krbPrincipalName: "nfs/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
       loop_control:
         loop_var: host
-      tags: krb_add_principals,krb_add_principals_hosts
-    - name: create principals in ldap for exist host IP-adresses
+# Host: NFS principals for short hostname
+    - name: create NFS principals in ldap for short hostname
+      community.general.ldap_attrs:
+        dn: "{{ host.value.dn }}"
+        attributes:
+          krbPrincipalName: "nfs/{{ host.key }}@{{ krb_default_realm }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+      loop_control:
+        loop_var: host
+# Host: NFS principals for IP addresses
+    - name: create NFS principals in ldap for full hostname
       community.general.ldap_attrs:
         dn: "{{ host.0.value.dn }}"
         attributes:
-          krbPrincipalName: "host/{{ host.1 }}@{{ krb_default_realm }}"
+          krbPrincipalName: "nfs/{{ host.1 }}@{{ krb_default_realm }}"
       loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
       loop_control:
         loop_var: host
-      tags: krb_add_principals,krb_add_principals_hosts
-    - name: create principals for services 
-      ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ service.value.dn }}\" {{ service.key }}/{{ common_domain_name }}@{{ krb_default_realm }}"
-      when: service.key not in list_principals.stdout
-      loop: "{{  lookup('ansible.builtin.dict', ldap_services, wantlist=True) }}"
-      loop_control:
-        loop_var: service
-      tags: krb_add_principals,krb_add_principals_services
-    - name: create principals in ldap for any hosts of services
-      community.general.ldap_attrs:
-        dn: "{{ service.0.value.dn }}"
-        attributes:
-          krbCanonicalName: "{{ service.0.key }}/{{ common_domain_name }}@{{ krb_default_realm }}"
-          krbPrincipalName: "{{ service.0.key }}/{{ service.1 }}@{{ krb_default_realm }}"
-      loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) | subelements('value.host') }}"
-      loop_control:
-        loop_var: service
-      tags: krb_add_principals,krb_add_principals_services
-    - name: add indexes into LDAP db
-      community.general.ldap_attrs:
-        dn: "{{ ldap_db_dn }}"
-        attributes:
-          olcDbIndex: "{{ item }}"
-      loop:
-        - "ou eq"
-        - "krbPrincipalName eq"
-      when: krb_krb5_db_type == "kldap"
-      tags: krb_add_principals,krb_idx_principals,krb_add_principals_users,krb_add_principals_hosts,krb_add_principals_services
-  when: common_hostname == common_primary_dc
+    when: nfs_server_auth == 'krb5'
+    tags: krb_add_principals,krb_add_principals_hosts
+#=== Services principals ===
+# Base services principals
+  - name: create principals for services 
+    ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ service.value.dn }}\" {{ service.key }}/{{ common_domain_name }}@{{ krb_default_realm }}"
+    when: service.key not in list_principals.stdout and service.key != 'nfs'
+    loop: "{{  lookup('ansible.builtin.dict', ldap_services, wantlist=True) }}"
+    loop_control:
+      loop_var: service
+    tags: krb_add_principals,krb_add_principals_services
+# Extended services principals
+  - name: create principals in ldap for any hosts of services
+    community.general.ldap_attrs:
+      dn: "{{ service.0.value.dn }}"
+      attributes:
+        krbCanonicalName: "{{ service.0.key }}/{{ common_domain_name }}@{{ krb_default_realm }}"
+        krbPrincipalName: "{{ service.0.key }}/{{ service.1 }}@{{ krb_default_realm }}"
+    loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) | subelements('value.host') }}"
+    loop_control:
+      loop_var: service
+    when: service.key != 'nfs'
+    tags: krb_add_principals,krb_add_principals_services
+# LDAP Indexes for principals
+  - name: add indexes into LDAP db
+    community.general.ldap_attrs:
+      dn: "{{ ldap_db_dn }}"
+      attributes:
+        olcDbIndex: "{{ item }}"
+    loop:
+      - "ou eq"
+      - "krbPrincipalName eq"
+    when: krb_krb5_db_type == "kldap"
+    tags: krb_add_principals,krb_idx_principals,krb_add_principals_users,krb_add_principals_hosts,krb_add_principals_services
+  when: common_full_hostname == common_primary_dc
+#===== Principals: END =====
 
+#=====  keytabs on KDC: BEGIN =====
 - name: create keytab files on kdc
   block:
 ### Remove old records in system and ldap keytabs ###
 # system keytab
-    - name: clean old records of fqdn in system keytab file
-      ansible.builtin.command: "kadmin.local ktrem host/{{ ansible_fqdn }} all"
-      tags: krb_client_config,krb_client_kdc
-    - name: clean old records of short hostname in system keytab file
-      ansible.builtin.command: "kadmin.local ktrem host/{{ ansible_hostname }} all"
-      tags: krb_client_config,krb_client_kdc
+  - name: clean old records of fqdn in system keytab file
+    ansible.builtin.command: "kadmin.local ktrem host/{{ common_full_hostname }} all"
+    tags: krb_client_config,krb_client_kdc
+  - name: clean old records of short hostname in system keytab file
+    ansible.builtin.command: "kadmin.local ktrem host/{{ common_short_hostname }} all"
+    tags: krb_client_config,krb_client_kdc
 # ldap keytab
-    - name: clean old records of fqdn in ldap keytab file
-      ansible.builtin.command: "kadmin.local ktrem -k {{ ldap_keytab_file }} host/{{ ansible_fqdn }} all"
-      tags: krb_client_config,krb_client_ldap
-    - name: clean old records of short name in ldap keytab file
-      ansible.builtin.command: "kadmin.local ktrem -k {{ ldap_keytab_file }} host/{{ ansible_hostname }} all"
-      tags: krb_client_config,krb_client_ldap
+  - name: clean old records of fqdn in ldap keytab file
+    ansible.builtin.command: "kadmin.local ktrem -k {{ ldap_keytab_file }} host/{{ common_full_hostname }} all"
+    tags: krb_client_config,krb_client_ldap
+  - name: clean old records of short name in ldap keytab file
+    ansible.builtin.command: "kadmin.local ktrem -k {{ ldap_keytab_file }} host/{{ common_short_hostname }} all"
+    tags: krb_client_config,krb_client_ldap
 ### add host keys into system and ldap keytabs ###
-# system keytab
+# system keytab: hosts
+  - name: add host key for FQDN into host keytab
+    ansible.builtin.command: "kadmin.local ktadd -norandkey host/{{ common_full_hostname }}"
+    tags: krb_client_config,krb_client_kdc
+  - name: add host key for shortname into host keytab
+    ansible.builtin.command: "kadmin.local ktadd -norandkey host/{{ common_short_hostname }}"
+    tags: krb_client_config,krb_client_kdc
+# system keytab: nfs
+  - name: add NFS keys into system keytab
+    block:
     - name: add host key for FQDN into host keytab
-      ansible.builtin.command: "kadmin.local ktadd -norandkey host/{{ ansible_fqdn }}"
+      ansible.builtin.command: "kadmin.local ktadd -norandkey nfs/{{ common_full_hostname }}"
       tags: krb_client_config,krb_client_kdc
     - name: add host key for shortname into host keytab
-      ansible.builtin.command: "kadmin.local ktadd -norandkey host/{{ ansible_hostname }}"
+      ansible.builtin.command: "kadmin.local ktadd -norandkey nfs/{{ common_short_hostname }}"
       tags: krb_client_config,krb_client_kdc
+    when: nfs_server_auth == 'krb5'
 # ldap keytab
-    - name: add host key of fqdn into ldap keytab file
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k {{ ldap_keytab_file }} host/{{ ansible_fqdn }}"
-      tags: krb_client_config,krb_client_kdc,krb_client_kdc_ldap
-    - name: add host key of short name in ldap keytab file
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k {{ ldap_keytab_file }} host/{{ ansible_hostname }}"
-      tags: krb_client_config,krb_client_kdc,krb_client_kdc_ldap
-    - name: set mode, owner and group for ldap keytab
-      ansible.builtin.file:
-        path: "{{ ldap_keytab_file }}"
-        owner: "{{ ldap_system_user }}"
-        group: "{{ ldap_system_group }}"
-        mode: 0600
-      tags: krb_client_config,krb_client_ldap
+  - name: add host key of fqdn into ldap keytab file
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k {{ ldap_keytab_file }} host/{{ common_full_hostname }}"
+    tags: krb_client_config,krb_client_kdc,krb_client_kdc_ldap
+  - name: add host key of short name in ldap keytab file
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k {{ ldap_keytab_file }} host/{{ common_short_hostname }}"
+    tags: krb_client_config,krb_client_kdc,krb_client_kdc_ldap
+  - name: set mode, owner and group for ldap keytab
+    ansible.builtin.file:
+      path: "{{ ldap_keytab_file }}"
+      owner: "{{ ldap_system_user }}"
+      group: "{{ ldap_system_group }}"
+      mode: 0600
+    tags: krb_client_config,krb_client_ldap
   when: krb_servers_group in group_names
-#  when: krb_is_server is defined and krb_is_server | bool
+#=====  keytabs on KDC: END =====
 
+#=====  keytabs for other hosts: BEGIN =====
+### Create keytabs on KDC: BEGIN ###
 - name: create host/services keytab for other hosts
   block:
-    - name: check if directory for keytabs exists
-      ansible.builtin.file:
-        path: "/tmp/kdc"
-        state: directory
-      tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
-    - name: check if local directory for keytabs exists
-      ansible.builtin.file:
-        path: "/tmp/kdc"
-        state: directory
-        mode: 0777
-      delegate_to: 127.0.0.1
-      tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+# create temp dir for keytabs on KDC
+  - name: check if directory for keytabs exists
+    ansible.builtin.file:
+      path: "/tmp/kdc"
+      state: directory
+    tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+# create temp dir for keytabs on localhost
+  - name: check if local directory for keytabs exists
+    ansible.builtin.file:
+      path: "/tmp/kdc"
+      state: directory
+      mode: 0777
+    delegate_to: 127.0.0.1
+    tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+# Create  host system keytab for FQDN on primary KDC
+  - name: create host keytabs on primary KDC with key for FQDN
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab host/{{ hostvars[item]['common_full_hostname'] }}"
+    loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
+    tags: krb_client_config,krb_ktb4hosts
+# add key for short name into system keytab on primary KDC
+  - name: add host key for short name into keytab on primary KDC
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab host/{{ hostvars[item]['common_short_hostname'] }}"
+    loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
+    tags: krb_client_config,krb_ktb4hosts
+  - name: add keys for NFS into system keytabs
+    block:
+# add NFS key for FQDN into system keytab on primary KDC
     - name: create host keytabs on primary KDC with key for FQDN
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars['item']['common_short_hostname'] }}.keytab host/{{ common_full_hostname }}"
+      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab nfs/{{ hostvars[item]['common_full_hostname'] }}"
       loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
       tags: krb_client_config,krb_ktb4hosts
-    - name: add host key for short name nto keytab on primary KDC
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars['item']['common_short_name'] }}.keytab host/{{ item }}"
+# add NFS key for short name into system keytab on primary KDC
+    - name: add host key for short name into keytab on primary KDC
+      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab nfs/{{ hostvars[item]['common_short_hostname'] }}"
       loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
       tags: krb_client_config,krb_ktb4hosts
-    - name: create service keytabs on primary KDC
-      ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/service-{{ item.0.key }}.keytab {{ item.0.key }}/{{ item.1 }}"
-      loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) | subelements('value.host') }}"
-      tags: krb_client_config,krb_ktb4services
-    - name: copy keytab files to local temp path
-      ansible.posix.synchronize:
-        dest: "/tmp/kdc/"
-        src: "/tmp/kdc/*"
-        mode: pull
-      tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
-    - name: copy files from temp dir to local store
-      ansible.builtin.copy:
-        src: "{{ item }}"
-        dest: "{{ common_local_store }}/" 
-      delegate_to: 127.0.0.1
-      with_fileglob:
-        - "/tmp/kdc/*keytab"
-      tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
-    - name: check if directory for keytabs removed
-      ansible.builtin.file:
-        path: "/tmp/kdc"
-        state: absent
-      tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
-    - name: check if local directory for keytabs removed
-      ansible.builtin.file:
-        path: "/tmp/kdc"
-        state: absent
-      delegate_to: 127.0.0.1
-      tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
-  when: common_hostname == common_primary_dc
+    when: nfs_server_auth == 'krb5'
+# Keytabs for services on primary KDC
+  - name: create service keytabs on primary KDC
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/service-{{ item.0.key }}.keytab {{ item.0.key }}/{{ item.1 }}"
+    loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) | subelements('value.host') }}"
+    tags: krb_client_config,krb_ktb4services
+# copy keytabs from primary KDC to local temp dir
+  - name: copy keytab files to local temp path
+    ansible.posix.synchronize:
+      dest: "/tmp/kdc/"
+      src: "/tmp/kdc/*"
+      mode: pull
+    tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+# copy keytabs from temp dir to local store
+  - name: copy files from temp dir to local store
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "{{ common_local_store }}/" 
+    delegate_to: 127.0.0.1
+    with_fileglob:
+      - "/tmp/kdc/*keytab"
+    tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+# Delete temp dir on primary KDC
+  - name: check if directory for keytabs removed
+    ansible.builtin.file:
+      path: "/tmp/kdc"
+      state: absent
+    tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+# Delete temp dir on localhost
+  - name: check if local directory for keytabs removed
+    ansible.builtin.file:
+      path: "/tmp/kdc"
+      state: absent
+    delegate_to: 127.0.0.1
+    tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
+  when: common_full_hostname == common_primary_dc
+### Create keytabs on KDC: END ###
 
 - name: copy keytab to remote host
   ansible.builtin.copy:
-    src: "{{ common_local_store }}/{{ ansible_hostname }}.keytab"
+    src: "{{ common_local_store }}/{{ common_short_hostname }}.keytab"
     dest: "/etc/krb5.keytab"
     owner: 'root'
     group: 'root'
     mode: 0600
   when: not krb_servers_group in group_names
-#  when: krb_is_server is not defined or not krb_is_server | bool
   tags: krb_client_config
+#=====  keytabs for other hosts: END =====
 

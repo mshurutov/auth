@@ -12,14 +12,14 @@
   register: ldap_DIT
   check_mode: no
   tags: ldap_setup_syncprov
-  when: common_hostname == common_primary_dc
+  when: common_full_hostname == common_primary_dc
 
 - name: copy ldap_DIT to controller as file
   ansible.builtin.copy:
     dest: "/tmp/DIT_data.ldif"
     content: "{{ ldap_DIT.stdout }}"
   tags: ldap_setup_syncprov
-  when: common_hostname == common_primary_dc
+  when: common_full_hostname == common_primary_dc
   delegate_to: 127.0.0.1
 
 # Every follow task run on other hosts.
@@ -28,14 +28,14 @@
     dest: "/tmp/DIT_data.ldif"
     src: "/tmp/DIT_data.ldif"
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: delete /tmp/DIT_data.ldif on local host
   ansible.builtin.file:
     path: "/tmp/DIT_data.ldif"
     state: absent
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
   delegate_to: 127.0.0.1
 
 - name: stop slapd on other hosts
@@ -43,14 +43,14 @@
     name: slapd
     state: stopped
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: delete old data on replica
   ansible.builtin.file:
     path: "{{ ldap_db_directory }}"
     state: absent
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: create {{ ldap_db_directory }} on replica
   ansible.builtin.file:
@@ -60,19 +60,19 @@
     group: "{{ ldap_system_group }}"
     mode: 0700
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: upload LDIF on others hosts
   ansible.builtin.command: slapadd -l /tmp/DIT_data.ldif -w
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: delete /tmp/DIT_data.ldif on remote host
   ansible.builtin.file:
     path: "/tmp/DIT_data.ldif"
     state: absent
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: set right ACLs on LDAP db dir
   ansible.builtin.file:
@@ -83,14 +83,14 @@
     mode: 0700
     recurse: yes
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 
 - name: start slapd on other hosts
   ansible.builtin.service:
     name: slapd
     state: started
   tags: ldap_setup_syncprov
-  when: common_hostname != common_primary_dc
+  when: common_full_hostname != common_primary_dc
 ### END: Copy DIT from {{ common_primary_dc }} to other hosts
 
 - name: get info about syncprov overlay

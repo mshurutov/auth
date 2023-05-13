@@ -1,7 +1,7 @@
 Role: auth
 ==========
 
-auth role is created for deploy centralized authentication.
+auth role is created for deploy centralized authentication using openldap+MIT kerberos+sssd.
 Copyright (C) 2023  Mikhail Shurutov
 
 This program is free software; you can redistribute it and/or
@@ -24,7 +24,7 @@ Requirements
 Role Variables
 --------------
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+Role has more variables.
 
 Dependencies
 ------------
@@ -48,4 +48,4 @@ License
 Author Information
 ------------------
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+My name is Mikhail Shurutov, I'm an operations engeener since 1997.

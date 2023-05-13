@@ -1,7 +1,10 @@
 ---
 
 - name: install auth services
-  ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
+#  ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
+  ansible.builtin.package:
+    name: "{{ auth_packages }}"
+    state: present
   tags: auth_install
 
 - name: check if local CA is exist on target host
@@ -12,7 +15,7 @@
 
 - name: copy root CA to target host
   ansible.builtin.copy:
-    src: "{{ common_local_store }}//{{ common_domain_name }}-ssl-ca.pem"
+    src: "{{ common_local_store }}/{{ common_domain_name }}-ssl-ca.pem"
     dest: "{{ common_ssl_CA }}"
     owner: "root"
     group: "root"

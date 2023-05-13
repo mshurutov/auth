@@ -22,6 +22,14 @@ slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
 # Files and directories
 ldap_version: "2.4"
 ldap_config_dir: "/etc/openldap"
+ldap_service_config: []
+#  for example configure slapd service on Gentoo Linux
+#  - regexp: '^#?\s*(OPTS_CONF="-f /etc/.*/slapd.conf)'
+#    path: /etc/conf.d/slapd
+#    line: '#\1'
+#  - regexp: '^#?\s*(OPTS_CONF="-F /etc/.*/slapd.d")'
+#    path: /etc/conf.d/slapd
+#    line: '\1'
 ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
 ldap_keytab_file: "{{ ldap_config_dir }}/ldap.keytab"
 ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
@@ -124,6 +132,8 @@ krb_kdc_port: 88
 krb_kadmin_port: 749
 krb_pwd_port: 464
 # common config parameters
+krb_kdc_service: "mit-krb5kdc"
+krb_kadmin_service: "mit-krb5kadmind"
 krb_krb5_db_type: "klmdb"
 krb_default_realm: "{{ common_domain_name | upper }}"
 krb_realms:
