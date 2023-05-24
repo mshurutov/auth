@@ -1,7 +1,6 @@
 ---
 
 - name: install auth services
-#  ansible.builtin.include_tasks: "{{ ansible_pkg_mgr }}.yml"
   ansible.builtin.package:
     name: "{{ auth_packages }}"
     state: present
@@ -34,6 +33,7 @@
     regexp: "^[\t ]*#?[\t ]*{{ item.key }}.*"
     line: "{{ item.key }} {{ item.value }}"
     state: present
+    create: true
   loop: "{{  lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
