@@ -43,11 +43,13 @@ Using a Role
 * `ANSIBLE_ROOT_ROLE_DIR` is path in `roles_path` config variable, for example: /data/ansible/roles  
 Content of my ~/.ansible.cfg:
 
-    ...
-    # additional paths to search for roles in, colon separated
-    #roles_path    = /etc/ansible/roles
-    roles_path    = /data/ansible/roles
-    ...
+```
+...
+# additional paths to search for roles in, colon separated
+#roles_path    = /etc/ansible/roles
+roles_path    = /data/ansible/roles
+...
+```
 
 ### Install role
 #### GIT repo
