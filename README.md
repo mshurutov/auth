@@ -42,7 +42,6 @@ Using a Role
 * `ANSIBLE_ROOT_DIR` is path for static content: roles,configs,etc, for example: /data/ansible
 * `ANSIBLE_ROOT_ROLE_DIR` is path in `roles_path` config variable, for example: /data/ansible/roles  
 Content of my ~/.ansible.cfg:
-
 ```
 ...
 # additional paths to search for roles in, colon separated
