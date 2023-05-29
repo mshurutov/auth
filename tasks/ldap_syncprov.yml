@@ -185,4 +185,3 @@
   loop_control:
     loop_var: idx
   tags: ldap_setup_syncprov,ldap_config_syncprov
-

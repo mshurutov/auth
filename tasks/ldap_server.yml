@@ -573,4 +573,3 @@
       tags: ldap_setup_tree,ldap_services
 ##=== END: SERVICES ===##
   when: common_full_hostname == common_primary_dc
-

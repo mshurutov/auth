@@ -1,7 +1,10 @@
+[TOC]
+
 Role: auth
 ==========
 
 auth role is created for deploy centralized authentication using openldap+MIT kerberos+sssd.
+
 Copyright (C) 2023  Mikhail Shurutov
 
 This program is free software; you can redistribute it and/or
@@ -24,7 +27,7 @@ Requirements
 Role Variables
 --------------
 
-Role has more variables.
+Role has many variables.
 
 Dependencies
 ------------

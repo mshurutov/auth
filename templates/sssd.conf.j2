@@ -83,7 +83,7 @@ ldap_uri = {% for ldap_host in groups[ldap_servers_group] %}ldaps://{{ hostvars[
 
 {% endif %}
 {% if key == "auth_provider" and value == "krb5" %}
-krb5_server = {% for krb_host in groups[krb_servers_group] %}{{ hostvars[krb_host]['ansible_host']}}{% if not loop.last %},{% endif %}{% endfor %}
+krb5_server = {% for krb_host in groups[krb_servers_group] %}{{ hostvars[krb_host]['common_full_hostname']}}{% if not loop.last %},{% endif %}{% endfor %}
 
 {% endif %}
 {% endfor %}

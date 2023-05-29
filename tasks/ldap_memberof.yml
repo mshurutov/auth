@@ -21,4 +21,3 @@
         olcMemberOfRefInt: "{{ lmo.attrs.olcMemberOfRefInt }}"
   when: common_full_hostname == common_primary_dc
   tags: ldap_setup_memberof
-

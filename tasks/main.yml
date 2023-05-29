@@ -80,4 +80,3 @@
     state: present
   when: ldap_sudo is defined
   tags: ldap_client_config,ldap_setup_sudo
-

@@ -50,5 +50,3 @@
     insertbefore: "{{ item.regexp }}"
   loop: "{{ sss_pam_settings }}"
   tags: auth_mech_config,pam_config
-
-

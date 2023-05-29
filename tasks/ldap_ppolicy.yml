@@ -98,4 +98,3 @@
           pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
       when: ldap_version > 2.5
       tags: ldap_setup_ppolicy
-

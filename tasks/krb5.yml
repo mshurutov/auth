@@ -324,4 +324,3 @@
   when: not krb_servers_group in group_names
   tags: krb_client_config
 #=====  keytabs for other hosts: END =====
-
