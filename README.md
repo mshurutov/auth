@@ -27,21 +27,64 @@ Requirements
 Role Variables
 --------------
 
-Role has many variables.
+Role has many variables. For details see defaults/main.yml
 
 Dependencies
 ------------
 
 A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
 
-Example Playbook
+Using a Role
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+### Variables Used
 
-    - hosts: servers
+* `ANSIBLE_ROOT_DIR` is path for static content: roles,configs,etc, for example: /data/ansible
+* `ANSIBLE_ROOT_ROLE_DIR` is path in `roles_path` config variable, for example: /data/ansible/roles  
+Content of my ~/.ansible.cfg:
+
+    ...
+    # additional paths to search for roles in, colon separated
+    #roles_path    = /etc/ansible/roles
+    roles_path    = /data/ansible/roles
+    ...
+
+### Install role
+#### GIT repo
+
+    user@host ~ $ cd $ANSIBLE_ROOT_ROLE_DIR
+    user@host roles $ git clone https://shurutov@git.code.sf.net/p/auth-role/code auth
+
+#### Ansible galaxy
+##### Installation from command
+
+    user@host ~ $ cd $ANSIBLE_ROOT_DIR
+    user@host ansible $ ansible-galaxy role install mshurutov.auth -p roles
+
+##### Installation from requirements.yml
+
+    user@host ~ $ cd $ANSIBLE_ROOT_DIR
+    user@host ansible $ grep auth requirements.yml
+    - name: mshurutov.auth
+    user@host ansible $ ansible-galaxy role install -r requirements.yml -p roles
+
+### Example Playbook
+
+#### Role installed as git repo
+
+    ...
+    - hosts: all
       roles:
-         - { role: username.rolename, x: 42 }
+         - role: auth
+    ...
+
+#### Role installed by ansible-galaxy
+
+    ...
+    - hosts: all
+      roles:
+         - role: mshurutov.auth
+    ...
 
 License
 -------
