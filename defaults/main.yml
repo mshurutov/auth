@@ -1,11 +1,13 @@
 ---
 
 # Common parameters for all tasks in role
-auth_type: "krb5" # may be ldap
-auth_mech: "sssd" # may be ?
+auth_type: "krb5" # authentication protocol, may be ldap
+auth_mech: "sssd" # authentication daemon, may be ?
+# Directories for store templates,files and vars
 auth_templates_dir: "{{ role_path }}/templates"
 auth_files_dir: "{{ role_path }}/files"
 auth_vars_dir: "{{ role_path }}/vars"
+# Directories for selfmade admin utilities
 auth_admin_path: "/usr/loca/sbin"
 # settings for install need services (default distro - Gentoo)
 auth_packages: "auth_{{ ansible_pkg_mgr }}_packages"
@@ -18,10 +20,28 @@ auth_portage_packages:
   - "dev-tcltk/expect"
   - "sys-auth/pam_krb5"
 # System settings for ldap part: files and dirs, system users and groups, connection info etc
-slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
-# Files and directories
 ldap_version: "2.4"
+# Files and directories. May be distribution-depended, so there is should be specified.
+# File for override systemd unit parameters 
+slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
+# Base config directory. Other configs store in this place.
 ldap_config_dir: "/etc/openldap"
+# Directory for store cn=config ldap data
+ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
+# Directory for store and load schema data
+ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
+# Kerberos keytab file
+ldap_keytab_file: "{{ ldap_config_dir }}/ldap.keytab"
+# Files and directories of SSL/TLS keys/certs
+ldap_ssl_dir: "{{ ldap_config_dir }}/ssl"
+ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ common_full_hostname }}-private.key"
+ldap_ssl_csr: "{{ ldap_ssl_dir }}/{{ common_full_hostname }}.csr"
+ldap_ssl_cert: "{{ ldap_ssl_dir }}/{{ common_full_hostname }}.crt"
+# Directory where modules is stored and from loaded
+ldap_module_path: "/usr/lib64/openldap/openldap"
+# Database Directory
+ldap_db_directory: "/var/lib/openldap-data"
+# Parameters for slapd service.
 ldap_service_config: []
 #  for example configure slapd service on Gentoo Linux
 #  - regexp: '^#?\s*(OPTS_CONF="-f /etc/.*/slapd.conf)'
@@ -30,22 +50,13 @@ ldap_service_config: []
 #  - regexp: '^#?\s*(OPTS_CONF="-F /etc/.*/slapd.d")'
 #    path: /etc/conf.d/slapd
 #    line: '\1'
-ldap_config_db_dir: "{{ ldap_config_dir }}/slapd.d"
-ldap_keytab_file: "{{ ldap_config_dir }}/ldap.keytab"
-ldap_config_schema_dir: "{{ ldap_config_dir }}/schema"
-ldap_ssl_dir: "{{ ldap_config_dir }}/ssl"
-ldap_ssl_pkey: "{{ ldap_ssl_dir }}/{{ common_full_hostname }}-private.key"
-ldap_ssl_csr: "{{ ldap_ssl_dir }}/{{ common_full_hostname }}.csr"
-ldap_ssl_cert: "{{ ldap_ssl_dir }}/{{ common_full_hostname }}.crt"
-ldap_module_path: "/usr/lib64/openldap/openldap"
-ldap_db_directory: "/var/lib/openldap-data"
 # System user and group
 ldap_system_user: "ldap"
 ldap_system_group: "ldap"
 # Connection info: ports
 ldap_port: 389
 ldap_ssl_port: 686
-# Parameters for unit file
+# Parameters for unit file.
 ldap_unit_params:
   - regexp: '^#?\s*(Environment.*-f.*)' # check if config file is disabled
     line: '#\1'
@@ -70,24 +81,34 @@ ldap_schema_only:
   - "samba"
   - "sudo"
 # Any other settings
+# Log settings
 ldap_loglevel: "stats stats2"
+# Database settings: size,type,DN
 ldap_db_config_max_size: 1073741824 
 ldap_config_db_type: "mdb"
 ldap_db_data_number: 1
+# This parameter with previous has value "olcDatabase={1}mdb,cn=config" 
 ldap_db_dn: "olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config"
+# Base LDAP parameters. Should be redefined.
 ldap_base_name: "mycompany"
 ldap_organization_name: "Example Company"
 ldap_organization_desc: "Mycompany company"
 ldap_base_suffix: "dc=mycompany,dc=local"
+# Owner of instance/DB. Password should be strored encryption, not plain text.
 ldap_rootdn: "cn=ldap_owner,{{ ldap_base_suffix }}"
 ldap_root_password: "zaq123wsx"
+# LDAP connections parameters for maintenance
 ldap_server_uri: "ldapi:///"
 ldap_conf_params:
   BASE: "{{ ldap_base_suffix }}"
   URI: "ldap://{{ common_primary_dc }}"
+# Base settings for password policy
 ldap_pass_enc_func: "{CRYPT}"
 ldap_password_crypt_format: "$6$%.16s"
-ldap_ops_group: "cn=ops,ou=groups,{{ ldap_base_suffix }}"
+# Base ACL:
+# password may be changed by owner or member of {{ ldap_ops_group }},
+# anonymous may use for auth, other don't have access to this attribute.
+# Other attributes owner and member of {{ ldap_ops_group }} can change, other can read.
 ldap_bs_acl:
   - '{0}to attrs=userPassword
     by self write 
@@ -100,6 +121,7 @@ ldap_bs_acl:
     by users read
     by * none'
 # Settings for create objects
+# Default OUs - for users and groups
 ldap_default_ous:
   - ou: "users"
     dn: "ou=users,{{ ldap_base_suffix }}"
@@ -107,25 +129,33 @@ ldap_default_ous:
   - ou: "groups"
     dn: "ou=groups,{{ ldap_base_suffix }}"
     description: "Groups of {{ ldap_organization_name }}"
+# Variables for PosixAccount objectclass
 ldap_loginshell: '/bin/bash'
 ldap_home_root: '/home'
+# Any variables for any objects.
 ldap_users_ou: "ou=users,{{ ldap_base_suffix }}"
 ldap_groups_ou: "ou=groups,{{ ldap_base_suffix }}"
+ldap_ops_group: "cn=ops,ou=groups,{{ ldap_base_suffix }}"
+# LDAP reader. Any programs need this account.
 ldap_reader_dn: "uid=reader,{{ ldap_users_ou }}"
 ldap_reader_password: "ldap_reader_pwd"
+# Any variables for memberof overlay
 ldap_memberof_group_oc: "groupOfNames"
 ldap_memberof_member_ad: "member"
 ldap_memberof_memberof_ad: "memberOf"
 ldap_memberof_refint: "FALSE"
+# Variable(s) for syncprov overlay
 ldap_spcheckpoint: "5 60"
 
 ### defaults values for krb auth ###
-# Pathes and files
+# Pathes and files.
+# KDC configs and any files and directories
 krb_krb5_db_path: "/var/lib/krb5kdc"
 krb_krb5_kdc_config_path: "{{ krb_krb5_db_path }}"
 krb_kdc_config: "{{ krb_krb5_kdc_config_path }}/kdc.conf"
 krb_acl_config: "{{ krb_krb5_kdc_config_path }}/kadm5.acl"
 krb_stash_file: "{{ krb_krb5_kdc_config_path }}/kdc.stash"
+# Kerberos client config
 krb_common_config: "/etc/krb5.conf"
 # Netrwotk settings
 krb_kdc_port: 88
@@ -135,6 +165,7 @@ krb_pwd_port: 464
 krb_kdc_service: "mit-krb5kdc"
 krb_kadmin_service: "mit-krb5kadmind"
 krb_krb5_db_type: "klmdb"
+# Now Kerberos and LDAP can handle only one LDAP DIT and Kerberos realm
 krb_default_realm: "{{ common_domain_name | upper }}"
 krb_realms:
   - realm: "{{ krb_default_realm }}"
@@ -145,7 +176,7 @@ krb_realms:
     default_domain: "{{ common_domain_name }}"
 krb_logging:
   - default: "SYSLOG:ERR:DAEMON"
-# Example of krb_appdefaults
+# Example of krb_appdefaults (this settings is not tested!)
 #krb_appdefaults:
 #  apps:
 #    app1:
