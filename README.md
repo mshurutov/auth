@@ -56,7 +56,7 @@ roles_path    = /data/ansible/roles
 #### GIT repo
 
     user@host ~ $ cd $ANSIBLE_ROOT_ROLE_DIR
-    user@host roles $ git clone https://shurutov@git.code.sf.net/p/auth-role/code auth
+    user@host roles $ git clone https://git.code.sf.net/p/auth-role/code auth
 
 #### Ansible galaxy
 ##### Installation from command
