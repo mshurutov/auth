@@ -1,8 +1,8 @@
 ---
 
 # Common parameters for all tasks in role
-auth_type: "krb5" # authentication protocol, may be ldap
-auth_mech: "sssd" # authentication daemon, may be ?
+auth_proto: "krb5" # authentication protocol, may be ldap
+auth_daemon: "sssd" # authentication daemon, may be ?
 # Directories for store templates,files and vars
 auth_templates_dir: "{{ role_path }}/templates"
 auth_files_dir: "{{ role_path }}/files"

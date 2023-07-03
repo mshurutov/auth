@@ -7,7 +7,7 @@
     dest: "{{ krb_common_config }}"
     owner: "root"
     group: "root"
-  tags: krb_config,krb_client_config,krb_common_config
+  tags: krb_config,krb_client_config
 
 #===== Server configuration: BEGIN =====
 - name: create server configs
@@ -50,7 +50,7 @@
     ansible.builtin.command: "kdb5_ldap_util create {% if krb_subtrees is defined %}-subtrees \"{{ krb_subtrees }}\"{% endif %} -P {{ ldap_krb_admin_password }} -r {{ krb_default_realm }}"
     tags: krb_config,krb_init_ldap
     when: common_full_hostname == common_primary_dc and krb_krb5_db_type == "kldap" and krb_init_force is defined and krb_init_force | bool
-#===== Mater-key file =====
+#===== Master-key file =====
 # on primary KDC
   - name: check if master key is not exist
     ansible.builtin.file:
@@ -322,5 +322,5 @@
     group: 'root'
     mode: 0600
   when: not krb_servers_group in group_names
-  tags: krb_client_config
+  tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
 #=====  keytabs for other hosts: END =====

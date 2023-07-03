@@ -10,7 +10,7 @@
   ansible.builtin.stat:
     path: "{{ common_ssl_CA }}"
   register: stat_ssl_ca
-  tags: auth_ssl
+  tags: auth_ssl_ca
 
 - name: copy root CA to target host
   ansible.builtin.copy:
@@ -20,7 +20,7 @@
     group: "root"
     mode: 0644
   when: ! stat_ssl_ca.stat.exists
-  tags: auth_ssl
+  tags: auth_ssl_ca
 
 - name: setup LDAP server
   ansible.builtin.import_tasks: ldap_server.yml
@@ -49,34 +49,34 @@
   loop: "{{  lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
-- name: configure auth service if auth_type is not ldap (default krb5)
-  ansible.builtin.include_tasks: "{{ auth_type }}.yml" 
-  when: auth_type != "ldap"
-  tags: auth_service_setup
+- name: configure auth service if auth_proto is not ldap (default krb5)
+  ansible.builtin.include_tasks: "{{ auth_proto }}.yml" 
+  when: auth_proto != "ldap"
+  tags: auth_proto_setup
 
-- name: configure auth mech if auth_mech is not ldap (default sssd)
-  ansible.builtin.include_tasks: "{{ auth_mech }}.yml" 
-  when: auth_mech != "ldap"
-  tags: auth_mech_setup
+- name: configure auth daemon if auth_daemon is not ldap (default sssd)
+  ansible.builtin.include_tasks: "{{ auth_daemon }}.yml" 
+  when: auth_daemon != "ldap"
+  tags: auth_daemon_setup
 
-- name: add passwd/shadow/group over {{ auth_mech }} into /etc/nsswitch.conf
+- name: add passwd/shadow/group over {{ auth_daemon }} into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "{{ item }}"
-    line: '\1:\2{{ auth_mech | regex_replace("sssd","sss") }} \3'
+    line: '\1:\2{{ auth_daemon | regex_replace("sssd","sss") }} \3'
     state: present
     backrefs: yes
   loop:
     - "^(passwd):([ \t]*).*(files).*$"
     - "^(shadow):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
     - "^(group):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
-  tags: auth_mech_config
+  tags: auth_daemon_config
 
 - name: add sudo over ldap into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "^ *#? *sudoers"
-    line: "sudoers:    {{ auth_mech | regex_replace(\"sssd\",\"sss\") }} files"
+    line: "sudoers:    {{ auth_daemon | regex_replace(\"sssd\",\"sss\") }} files"
     state: present
   when: ldap_sudo is defined
   tags: ldap_client_config,ldap_setup_sudo

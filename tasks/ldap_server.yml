@@ -32,7 +32,7 @@
       backrefs: yes
     loop: "{{ ldap_daemon_config }}"
     when: ldap_daemon_config is defined
-    tags: auth_install
+    tags: ldap_init,ldap_daemon_config
 ## Remove config and data DB dirs
   - name: delete config and data DB dirs
     ansible.builtin.file:
@@ -143,7 +143,7 @@
     state: started
   notify:
     - enable slapd
-  tags: ldap_setup,ldap_start,ldap_setup_overlays
+  tags: ldap_setup,slapd_start,ldap_setup_overlays
 # First there is need SSL only connect from network
 # So, add this thing
 # Create dir for SSL keys/csr/cert
@@ -154,7 +154,7 @@
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
     mode: 0755
-  tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
 # Create SSL private key
 - name: create private key for LDAP SSL
   community.crypto.openssl_privatekey:
@@ -162,7 +162,7 @@
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
     mode: 0600
-  tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
 # Create CSR (Certificate Signing Request)
 - name: create Certificate Signing Request for LDAP SSL
   community.crypto.openssl_csr:
@@ -177,7 +177,7 @@
     subject_alt_name: "{{ common_ssl_subject_alt_name | default(omit) }}"
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
-  tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
 # Create cert
 - name: create certificate for LDAP SSL
   community.crypto.x509_certificate:
@@ -189,7 +189,7 @@
     provider: ownca
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
-  tags: ldap_setup_tree,ldap_ssl,ldap_ssl_cert
+  tags: ldap_setup,ldap_ssl,ldap_ssl_cert
 # Add SSL support into slapd config
 - name: add SSL support
   community.general.ldap_attrs:
@@ -201,7 +201,7 @@
       olcTLSCertificateFile: "{{ ldap_ssl_cert }}"
       olcTLSCertificateKeyFile: "{{ ldap_ssl_pkey }}"
       olcTLSCACertificateFile: "{{ common_ssl_CA }}"
-  tags: ldap_setup_tree,ldap_ssl,ldap_ssl_config
+  tags: ldap_setup,ldap_ssl,ldap_ssl_config
 
 # Operation of add module crashes if module is loaded yet
 - name: Load any additional modules
@@ -305,7 +305,7 @@
               olcAccess: "{{ '{' }}{{ acl_max_number.stdout | int + 1 }}{{ '}' }}to dn.subtree=\"{{ ldap_krb_pack }}\" by group.exact=\"{{ ldap_ops_group }}\" manage by group.exact=\"{{ ldap_krb_group }}\" manage by * none"
           when: acl_exist.stdout == ""
           tags: ldap_setup_tree,ldap_setup_krb
-      when: auth_type == "krb5"
+      when: auth_proto == "krb5"
 ##=== END: Kerberos support ===##
 #=====
 ##=== BEGIN: sudo over ldap support ===##
@@ -440,7 +440,7 @@
         attributes:
           cn: "{{ item.1 }}"
       loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.cn',skip_missing=True) }}"
-      tags: ldap_setup_tree,ldap_users,ldap_users_mail
+      tags: ldap_setup_tree,ldap_users,ldap_users_cn
 # Modify user: add mail addresses if it is defined
     - name: add mails for user
       community.general.ldap_attrs:
@@ -474,14 +474,14 @@
             attributes:
               objectClass: "ldapPublicKey"
           loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
-          tags: ldap_setup_tree,ldap_users_sshkeys
+          tags: ldap_setup_tree,ldap_users,ldap_users_sshkeys
         - name: add sshkeys for user
           community.general.ldap_attrs:
             dn: "{{ item.0.value.dn }}"
             attributes:
              sshPublicKey: "{{ item.1 }}"
           loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.sshPublicKey',skip_missing=True) }}"
-          tags: ldap_setup_tree,ldap_users_sshkeys
+          tags: ldap_setup_tree,ldap_users,ldap_users_sshkeys
       when: ldap_sshkeys is defined and ldap_sshkeys | bool
 # Modify user: add primary group
     - name: add primary group for users
@@ -495,7 +495,7 @@
           memberUid: "{{ item.value.uidNumber }}"
           gidNumber: "{{ item.value.uidNumber }}"
       loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
-      tags: ldap_setup_tree,ldap_users
+      tags: ldap_setup_tree,ldap_users,ldap_primary_group
 # Modify user: add attributes for primary group
     - name: add additional attributes for account groups
       community.general.ldap_attrs:
@@ -506,7 +506,7 @@
           organizationalUnitName: "{{ item.0.value.organizationalUnitName | default(omit) }}"
           host: "{{ item.1 | default(omit) }}"
       loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.host',skip_missing=True) }}"
-      tags: ldap_setup_tree,ldap_users
+      tags: ldap_setup_tree,ldap_users,ldap_primary_group
 ##=== END: USERS ===##
 #=====
 ##=== BEGIN: GROUPS ===##
