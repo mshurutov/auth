@@ -90,6 +90,7 @@ roles_path    = /data/ansible/roles
          - role: mshurutov.auth
            tags: auth
     ...
+
 ### Deploy auth system using this role
 #### Tags
 * `auth_install` is used to install necessary soft;
