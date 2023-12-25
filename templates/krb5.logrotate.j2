@@ -1,0 +1,17 @@
+# file /etc/logrotate.d/mit-krb5 is managed by ansible
+# Don't edit manually
+/var/log/krb5*.log {
+    create
+    compress
+    delaycompress
+    missingok
+    notifempty
+    {{ krb_logrotate_period }}
+	{% if krb_logrotate_size is defined %}
+    size {{ krb_logrotate_size }}
+	{% endif %}
+    rotate {{ krb_logrotate_number }}
+    postrotate
+        /usr/bin/systemctl reload krb5-kdc 2> /dev/null > /dev/null || true
+    endscript
+}

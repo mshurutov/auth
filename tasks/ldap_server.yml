@@ -10,11 +10,17 @@
   loop: "{{ ldap_service_config }}"
   when: ldap_service_config is defined and ldap_service_config | length > 0
   tags: ldap_service_config
+## Copy initial ldif
+- name: copy templates to target host
+  ansible.builtin.template:
+    src: "{{ auth_templates_dir }}/slapd.logrotate.j2"
+    dest: /etc/logrotate.d/slapd
+  tags: ldap_service_config,ldap_service_logrotate
 ### Init ldap service ###
 ## Process of init is: stop slapd if started; delete config and db dirs;
 ## copy schemas *.ldif into server; create tmpdir; copy template of init.ldif to created dir
 ## create config and db dirs; init ldap service by exec command slapadd
-## there is "ldap_init_force" shoul be defined as true for this set of tasks
+## there is "ldap_init_force" should be defined as true for this set of tasks
 - name: init openldap service 
   block:
 ## Stop slapd service
@@ -344,27 +350,7 @@
 ##=== END: sudo over ldap support ===##
 #=====
 ##=== BEGIN: USERS ===##
-# add system users entry in LDAP tree
-    - name: add users to ldap
-      community.general.ldap_entry:
-        dn: "{{ item.value.dn }}"
-        objectClass:
-          - "posixAccount"
-          - "shadowAccount"
-          - "inetOrgPerson"
-        attributes:
-          cn: "{{ item.key }}"
-          sn: "{{ item.key }}"
-          uid: "{{ item.key }}"
-          uidNumber: "{{ item.value.uidNumber }}"
-          gidNumber: "{{ item.value.uidNumber }}"
-          homeDirectory: "{{ item.value.homeDirectory | default(ldap_home_root + '/' + item.key) }}"
-          loginShell: "{{ item.value.loginShell | default(ldap_loginshell) }}"
-          mail: "{{ item.value.mail | default('root') }}"
-      loop: "{{  lookup('ansible.builtin.dict', ldap_system_users, wantlist=True) }}"
-      when: ldap_system_users is defined
-      tags: ldap_setup_tree,ldap_users,ldap_system_users
-# add ordinary users entry in LDAP tree
+# add users entry in LDAP tree
     - name: add users to ldap
       community.general.ldap_entry:
         dn: "{{ item.value.dn }}"
@@ -430,9 +416,9 @@
         state: exact
         attributes:
           userPassword: "{{ item.value.userPassword | default(omit) }}"
-      loop: "{{  lookup('ansible.builtin.dict', ldap_users | ansible.builtin.combine(ldap_system_users,list_merge='append_rp',recursive='true'), wantlist=True) }}"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
       ignore_errors: true
-      tags: ldap_setup_tree,ldap_users,ldap_users_pwd,ldap_system_users
+      tags: ldap_setup_tree,ldap_users,ldap_users_pwd
 # Modify user: add cn's if it is defined
     - name: add cn's for user
       community.general.ldap_attrs:

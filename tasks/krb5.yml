@@ -12,21 +12,13 @@
 #===== Server configuration: BEGIN =====
 - name: create server configs
   block:
-# Stash file: script for create it
-  - name: copy script for create stash file to target host
+  - name: create /etc/krb5.conf
     ansible.builtin.template:
-      src: "{{ item }}"
-      dest: "/root/{{ item | basename | regex_replace('.j2') }}"
+      src: "{{ auth_templates_dir }}/krb5.logrotate.j2"
+      dest: "/etc/logrotate.d/krb5"
       owner: "root"
       group: "root"
-      mode: 0700
-    with_fileglob:
-      - "{{ auth_templates_dir }}/krb*.sh.j2"
-    tags: krb_config,krb_kdc_config
-# Stash file: create it
-  - name: create stashe file
-    ansible.builtin.command: "/root/krb_stash.sh {{ ldap_krb_admin }} {{ ldap_krb_admin_password}}"
-    tags: krb_config,krb_kdc_config
+    tags: krb_config,krb_logrotate
 # KDC configuration file
   - name: create {{ krb_kdc_config }}
     ansible.builtin.template:
@@ -45,39 +37,82 @@
     loop: "{{ krb_db_acls | default([]) }}"
     when: krb_db_acls is defined
     tags: krb_config,krb_kdc_config
+# Stash file: script for create it
+  - name: copy script for create stash file to target host
+    ansible.builtin.template:
+      src: "{{ item }}"
+      dest: "/root/{{ item | basename | regex_replace('.j2') }}"
+      owner: "root"
+      group: "root"
+      mode: 0700
+    with_fileglob:
+      - "{{ auth_templates_dir }}/krb*.sh.j2"
+    tags: krb_config,krb_kdc_config
+# The following tasks perform destructive actions, so they should only be executed when the appropriate flag is set.
+  - name: create any objects
+    block:
+# Stash file: create it
+    - name: create stashe file
+      ansible.builtin.command: "/root/krb_stash.sh {{ ldap_krb_admin }} {{ ldap_krb_admin_password}}"
+      tags: krb_config,krb_kdc_config
 # Add KRB5 structures in LDAP
-  - name: create Kerberos structure in LDAP
-    ansible.builtin.command: "kdb5_ldap_util create {% if krb_subtrees is defined %}-subtrees \"{{ krb_subtrees }}\"{% endif %} -P {{ ldap_krb_admin_password }} -r {{ krb_default_realm }}"
-    tags: krb_config,krb_init_ldap
-    when: common_full_hostname == common_primary_dc and krb_krb5_db_type == "kldap" and krb_init_force is defined and krb_init_force | bool
+    - name: create Kerberos structure in LDAP
+      ansible.builtin.command: "kdb5_ldap_util create {% if krb_subtrees is defined %}-subtrees \"{{ krb_subtrees }}\"{% endif %} -P {{ ldap_krb_admin_password }} -r {{ krb_default_realm }}"
+      tags: krb_config,krb_init_ldap
+      when: common_full_hostname == common_primary_dc and krb_krb5_db_type == "kldap"
 #===== Master-key file =====
 # on primary KDC
-  - name: check if master key is not exist
-    ansible.builtin.file:
-      path: "{{ krb_krb5_db_path }}/.k5.{{ krb_default_realm }}"
-      state: absent
-    when: common_full_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
-    tags: krb_config,krb_kdc_config
+    - name: check if master key is not exist
+      ansible.builtin.file:
+        path: "{{ krb_krb5_db_path }}/.k5.{{ krb_default_realm }}"
+        state: absent
+      when: common_full_hostname != common_primary_dc
+      tags: krb_config,krb_kdc_config
 # on other KDC
-  - name: create master key on other hosts
-    ansible.builtin.command: "/root/krb_mk.sh {{ ldap_krb_admin_password}}"
-    when: common_full_hostname != common_primary_dc and krb_init_force is defined and krb_init_force | bool
-    tags: krb_config,krb_kdc_config
+    - name: create master key on other hosts
+      ansible.builtin.command: "/root/krb_mk.sh {{ ldap_krb_admin_password}}"
+      when: common_full_hostname != common_primary_dc
+      tags: krb_config,krb_kdc_config
 #=====  (Re)start KRB5 services =====
 # KDC
-  - name: restart kdc
-    ansible.builtin.service:
-      name: "{{ krb_kdc_service }}"
-      state: restarted
-    tags: krb_config,krb_init_ldap
-    when: krb_init_force is defined and krb_init_force | bool
+    - name: restart kdc
+      ansible.builtin.service:
+        name: "{{ krb_kdc_service }}"
+        state: restarted
+      tags: krb_config,krb_init_ldap
 # KADMIN
-  - name: restart kadmind
-    ansible.builtin.service:
-      name: "{{ krb_kadmin_service }}" 
-      state: restarted
-    tags: krb_config,krb_init_ldap
+    - name: restart kadmind
+      ansible.builtin.service:
+        name: "{{ krb_kadmin_service }}" 
+        state: restarted
+      tags: krb_config,krb_init_ldap
     when: krb_init_force is defined and krb_init_force | bool
+# Add SASL GSSAPI support into slapd config
+# SaslHost
+  - name: add SaslHost attrs
+    community.general.ldap_attrs:
+      dn: "cn=config"
+      state: exact
+      attributes:
+        olcSaslHost: "{{ common_full_hostname }}"
+    tags: krb_config,krb_kdc_config,krb_sasl_ldap
+# SaslRealm and SaslSecProps
+  - name: add Sasl
+    community.general.ldap_attrs:
+      dn: "cn=config"
+      attributes:
+        olcSaslRealm: "{{ krb_default_realm }}"
+        olcSaslSecProps: "{{ krb_saslsecprops }}"
+    tags: krb_config,krb_kdc_config,krb_sasl_ldap
+# olcAuthzRegexp
+  - name: add olcAuthzRegexp
+    community.general.ldap_attrs:
+      dn: "cn=config"
+      attributes:
+        olcAuthzRegexp: "{{ item.regexp }} {{ item.replace }}"
+    loop: "{{ krb_auth_regexp }}"
+    when: krb_auth_regexp is defined and krb_auth_regexp | length > 0
+    tags: krb_config,krb_kdc_config,krb_sasl_ldap
   when: krb_servers_group in group_names
 #===== Server configuration: END =====
 
@@ -94,7 +129,7 @@
   - name: create principals in ldap for exist users
     ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ user.value.dn }}\" {{ user.key }}@{{ krb_default_realm }}"
     when: user.key not in list_principals.stdout
-    loop: "{{  lookup('ansible.builtin.dict', ldap_users| ansible.builtin.combine(ldap_system_users,list_merge='append_rp',recursive='true'), wantlist=True) }}"
+    loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
     loop_control:
       loop_var: user
     tags: krb_add_principals,krb_add_principals_users
@@ -103,6 +138,16 @@
     ansible.builtin.command: "kadmin.local add_principal -randkey -x dn=\"{{ host.value.dn }}\" host/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
     when: host.key not in list_principals.stdout
     loop: "{{  lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+    loop_control:
+      loop_var: host
+    tags: krb_add_principals,krb_add_principals_hosts
+# Host: short hostname principals
+  - name: create principals in ldap for exist host names
+    community.general.ldap_attrs:
+      dn: "{{ host.value.dn }}"
+      attributes:
+        krbPrincipalName: "host/{{ host.key }}@{{ krb_default_realm }}"
+    loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
     loop_control:
       loop_var: host
     tags: krb_add_principals,krb_add_principals_hosts
@@ -187,52 +232,24 @@
 - name: create keytab files on kdc
   block:
 ### Remove old records in system and ldap keytabs ###
-# system keytab
-  - name: clean old records of fqdn in system keytab file
-    ansible.builtin.command: "kadmin.local ktrem host/{{ common_full_hostname }} all"
-    tags: krb_client_config,krb_client_kdc
-  - name: clean old records of short hostname in system keytab file
-    ansible.builtin.command: "kadmin.local ktrem host/{{ common_short_hostname }} all"
-    tags: krb_client_config,krb_client_kdc
-# ldap keytab
-  - name: clean old records of fqdn in ldap keytab file
-    ansible.builtin.command: "kadmin.local ktrem -k {{ ldap_keytab_file }} host/{{ common_full_hostname }} all"
-    tags: krb_client_config,krb_client_ldap
-  - name: clean old records of short name in ldap keytab file
-    ansible.builtin.command: "kadmin.local ktrem -k {{ ldap_keytab_file }} host/{{ common_short_hostname }} all"
-    tags: krb_client_config,krb_client_ldap
-### add host keys into system and ldap keytabs ###
-# system keytab: hosts
+  - name: clean old host records in system keytab file
+    ansible.builtin.command: "kadmin.local ktrem -k {{ item.0.1 }} {{ item.1 }}/{{ item.0.0 }} all"
+    loop: "{{ [common_full_hostname,common_short_hostname] | product([krb_system_keytab,ldap_keytab_file ]) | product(['host','nfs','ldap']) | list }}"
+    tags: krb_client_kdc
+### add host,ldap and nfs keys into system and ldap keytabs ###
   - name: add host key for FQDN into host keytab
-    ansible.builtin.command: "kadmin.local ktadd -norandkey host/{{ common_full_hostname }}"
-    tags: krb_client_config,krb_client_kdc
-  - name: add host key for shortname into host keytab
-    ansible.builtin.command: "kadmin.local ktadd -norandkey host/{{ common_short_hostname }}"
-    tags: krb_client_config,krb_client_kdc
-# system keytab: nfs
-  - name: add NFS keys into system keytab
-    block:
-    - name: add host key for FQDN into host keytab
-      ansible.builtin.command: "kadmin.local ktadd -norandkey nfs/{{ common_full_hostname }}"
-      tags: krb_client_config,krb_client_kdc
-    - name: add host key for shortname into host keytab
-      ansible.builtin.command: "kadmin.local ktadd -norandkey nfs/{{ common_short_hostname }}"
-      tags: krb_client_config,krb_client_kdc
-    when: nfs_server_auth == 'krb5'
-# ldap keytab
-  - name: add host key of fqdn into ldap keytab file
-    ansible.builtin.command: "kadmin.local ktadd -norandkey -k {{ ldap_keytab_file }} host/{{ common_full_hostname }}"
-    tags: krb_client_config,krb_client_kdc,krb_client_kdc_ldap
-  - name: add host key of short name in ldap keytab file
-    ansible.builtin.command: "kadmin.local ktadd -norandkey -k {{ ldap_keytab_file }} host/{{ common_short_hostname }}"
-    tags: krb_client_config,krb_client_kdc,krb_client_kdc_ldap
+    ansible.builtin.command: "kadmin.local ktadd -k {{ item.0.1 }} -norandkey {{ item.1 }}/{{ item.0.0 }}"
+    loop: "{{ [common_full_hostname,common_short_hostname] | product([krb_system_keytab,ldap_keytab_file ]) | product(['host','nfs','ldap']) | list }}"
+    when: not ( item.1 == 'nfs' and item.0.1 == ldap_keytab_file )
+    tags: krb_client_kdc
+### set right permissions to ldap keytab 
   - name: set mode, owner and group for ldap keytab
     ansible.builtin.file:
       path: "{{ ldap_keytab_file }}"
       owner: "{{ ldap_system_user }}"
       group: "{{ ldap_system_group }}"
       mode: 0600
-    tags: krb_client_config,krb_client_ldap
+    tags: krb_client_kdc,krb_client_ldap
   when: krb_servers_group in group_names
 #=====  keytabs on KDC: END =====
 
@@ -267,12 +284,12 @@
   - name: add keys for NFS into system keytabs
     block:
 # add NFS key for FQDN into system keytab on primary KDC
-    - name: create host keytabs on primary KDC with key for FQDN
+    - name: add NFS service to keytabs on primary KDC with key for FQDN
       ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab nfs/{{ hostvars[item]['common_full_hostname'] }}"
       loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
       tags: krb_client_config,krb_ktb4hosts
 # add NFS key for short name into system keytab on primary KDC
-    - name: add host key for short name into keytab on primary KDC
+    - name: add NFS service for short name into keytab on primary KDC
       ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab nfs/{{ hostvars[item]['common_short_hostname'] }}"
       loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
       tags: krb_client_config,krb_ktb4hosts
@@ -324,3 +341,21 @@
   when: not krb_servers_group in group_names
   tags: krb_client_config,krb_ktb4hosts,krb_ktb4services
 #=====  keytabs for other hosts: END =====
+
+#=====  configure SSHD to accept connections over Kerberos: BEGIN =====
+- name: configure SSHD to accept connections over Kerberos
+  ansible.builtin.lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: '^#?\s*{{ item }}'
+    line: '{{ item }} yes'
+    state: present
+    backrefs: yes
+  loop:
+    - "KerberosAuthentication"
+    - "KerberosOrLocalPasswd"
+    - "KerberosTicketCleanup"
+    - "GSSAPIAuthentication"
+    - "GSSAPICleanupCredentials"
+  notify: reload sshd
+  tags: krb_ssh_set
+#=====  configure SSHD to accept connections over Kerberos: END =====

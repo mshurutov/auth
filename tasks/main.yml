@@ -1,5 +1,10 @@
 ---
 
+- name: set distro depended variables
+  ansible.builtin.include_vars:
+    file: "{{ auth_vars_dir }}/{{ ansible_pkg_mgr }}.yml"
+  tags: auth_set_vars
+
 - name: install auth services
   ansible.builtin.package:
     name: "{{ auth_packages }}"

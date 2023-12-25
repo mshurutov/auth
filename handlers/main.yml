@@ -103,3 +103,10 @@
   ansible.builtin.service:
     name: mit-krb5kadmind
     enabled: no
+
+# misc services
+- name: reload sshd
+  ansible.builtin.service:
+    name: sshd
+    state: reloaded
+

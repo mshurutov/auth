@@ -1,0 +1,4 @@
+---
+
+# set gentoo specific variables 
+auth_packages: "{{ auth_portage_packages }}"

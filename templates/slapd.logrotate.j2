@@ -1,0 +1,17 @@
+# File /var/log/slapd.log is managed by ansible
+# don't edit manually
+
+/var/log/slapd.log {
+    {{ ldap_logrotate_period }}
+    {% if ldap_logrotate_size is defined %}
+    size {{ ldap_logrotate_size }}
+    {% endif %}
+    rotate {{ ldap_logrotate_number }}
+    missingok
+    compress
+    delaycompress
+    notifempty
+    postrotate
+        systemctl reload rsyslog
+    endscript
+}

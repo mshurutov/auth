@@ -10,7 +10,7 @@ auth_vars_dir: "{{ role_path }}/vars"
 # Directories for selfmade admin utilities
 auth_admin_path: "/usr/loca/sbin"
 # settings for install need services (default distro - Gentoo)
-auth_packages: "auth_{{ ansible_pkg_mgr }}_packages"
+auth_packages:
 auth_portage_packages: 
   - "net-nds/openldap"
   - "dev-python/python-ldap"
@@ -64,6 +64,10 @@ ldap_unit_params:
     line: '\1'
   - regexp: '^Environment=.*SLAPD_URLS'
     line: 'Environment="SLAPD_URLS=ldaps:/// ldapi:///"' # disable unencrypted connect
+# Parameters for logrotate
+ldap_logrotate_period : "daily"
+ldap_logrotate_number: "4"
+
 
 # LDAP settings for service (OLC-way)
 # modules
@@ -157,6 +161,7 @@ krb_acl_config: "{{ krb_krb5_kdc_config_path }}/kadm5.acl"
 krb_stash_file: "{{ krb_krb5_kdc_config_path }}/kdc.stash"
 # Kerberos client config
 krb_common_config: "/etc/krb5.conf"
+krb_system_keytab: "/etc/krb5.keytab"
 # Netrwotk settings
 krb_kdc_port: 88
 krb_kadmin_port: 749
@@ -176,6 +181,9 @@ krb_realms:
     default_domain: "{{ common_domain_name }}"
 krb_logging:
   - default: "SYSLOG:ERR:DAEMON"
+krb_saslsecprops: "noanonymous,noplain"
+krb_logrotate_period: "daily"
+krb_logrotate_number: "4"
 # Example of krb_appdefaults (this settings is not tested!)
 #krb_appdefaults:
 #  apps:
