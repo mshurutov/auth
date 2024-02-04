@@ -1,7 +1,8 @@
 ---
 
 # Common parameters for all tasks in role
-auth_proto: "krb5" # authentication protocol, may be ldap
+auth_db: "openldap" # default is OpenLDAP, may be any others LDAP servers, ex. FreeIPA
+auth_proto: "krb5" # authentication protocol, may be ldap or FreeIPA
 auth_daemon: "sssd" # authentication daemon, may be ?
 # Directories for store templates,files and vars
 auth_templates_dir: "{{ role_path }}/templates"
@@ -19,6 +20,11 @@ auth_portage_packages:
   - "app-crypt/mit-krb5"
   - "dev-tcltk/expect"
   - "sys-auth/pam_krb5"
+auth_disable_modules:
+  - ".*pam_ldap.*"
+  - ".*pam_krb5.*"
+  - ".*pam_sss.*"
+  - ".*pam_systemd.*"
 # System settings for ldap part: files and dirs, system users and groups, connection info etc
 ldap_version: "2.4"
 # Files and directories. May be distribution-depended, so there is should be specified.
@@ -241,3 +247,4 @@ sss_pam_settings:
     - { regexp: "^account.*pam_unix.so.*", line: "account\t\tsufficient\tpam_sss.so" }
     - { regexp: "^password.*pam_unix.so.*", line: "password\tsufficient\tpam_sss.so use_authtok" }
     - { regexp: "^session.*pam_unix.so.*", line: "session\t\tsufficient\tpam_sss.so" }
+    - { regexp: "^session.*pam_sss.so.*", line: "session\t\toptional\tpam_systemd.so" }

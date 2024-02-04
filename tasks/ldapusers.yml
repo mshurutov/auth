@@ -1,0 +1,147 @@
+---
+
+# add users entry in LDAP tree
+- name: add users to ldap
+  community.general.ldap_entry:
+    dn: "{{ item.value.dn }}"
+    objectClass:
+      - "posixAccount"
+      - "shadowAccount"
+      - "inetOrgPerson"
+    attributes:
+      cn: "{{ item.key }}"
+      sn: "{{ item.key }}"
+      uid: "{{ item.key }}"
+      uidNumber: "{{ item.value.uidNumber }}"
+      gidNumber: "{{ item.value.uidNumber }}"
+      homeDirectory: "{{ item.value.homeDirectory | default(ldap_home_root + '/' + item.key) }}"
+      loginShell: "{{ item.value.loginShell | default(ldap_loginshell) }}"
+      mail: "{{ item.value.mail }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  tags: ldap_setup_tree,ldap_users
+# Modify user entry with any additional attributes
+- name: add additional attributes for users
+  community.general.ldap_attrs:
+    dn: "{{ item.value.dn }}"
+    state: exact
+    attributes:
+      gecos: "{{ item.value.gecos | default(omit) }}"
+      description: "{{ item.value.description | default(omit) }}"
+      shadowLastChange: "{{ item.value.shadowLastChange | default(omit) }}"
+      shadowMin: "{{ item.value.shadowMin | default(omit) }}"
+      shadowMax: "{{ item.value.shadowMax | default(omit) }}"
+      shadowWarning: "{{ item.value.shadowWarning | default(omit) }}"
+      shadowInactive: "{{ item.value.shadowInactive | default(omit) }}"
+      shadowExpire: "{{ item.value.shadowExpire | default(omit) }}"
+      shadowFlag: "{{ item.value.shadowFlag | default(omit) }}"
+      audio: "{{ item.value.audio | default(omit) }}"
+      businessCategory: "{{ item.value.businessCategory | default(omit) }}"
+      carLicense: "{{ item.value.carLicense | default(omit) }}"
+      departmentNumber: "{{ item.value.departmentNumber | default(omit) }}"
+      displayName: "{{ item.value.displayName | default(omit) }}"
+      employeeNumber: "{{ item.value.employeeNumber | default(omit) }}"
+      employeeType: "{{ item.value.employeeType | default(omit) }}"
+      givenName: "{{ item.value.givenName | default(omit) }}"
+      homePhone: "{{ item.value.homePhone | default(omit) }}"
+      homePostalAddress: "{{ item.value.homePostalAddress | default(omit) }}"
+      initials: "{{ item.value.initials | default(omit) }}"
+      jpegPhoto: "{{ item.value.jpegPhoto | default(omit) }}"
+      labeledURI: "{{ item.value.labeledURI | default(omit) }}"
+      manager: "{{ item.value.manager | default(omit) }}"
+      organizationName: "{{ item.value.organizationName | default(omit) }}"
+      pager: "{{ item.value.pager | default(omit) }}"
+      roomNumber: "{{ item.value.roomNumber | default(omit) }}"
+      secretary: "{{ item.value.secretary | default(omit) }}"
+      userCertificate: "{{ item.value.userCertificate | default(omit) }}"
+      x500uniqueIdentifier: "{{ item.value.x500uniqueIdentifier | default(omit) }}"
+      preferredLanguage: "{{ item.value.preferredLanguage | default(omit) }}"
+      userSMIMECertificate: "{{ item.value.userSMIMECertificate | default(omit) }}"
+      userPKCS12: "{{ item.value.userPKCS12 | default(omit) }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  tags: ldap_setup_tree,ldap_users
+# Modify user: add password if it is defined
+- name: add password for every user
+  community.general.ldap_attrs:
+    dn: "{{ item.value.dn }}"
+    state: exact
+    attributes:
+      userPassword: "{{ item.value.userPassword | default(omit) }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  ignore_errors: true
+  tags: ldap_setup_tree,ldap_users,ldap_users_pwd
+# Modify user: add cn's if it is defined
+- name: add cn's for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      cn: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.cn',skip_missing=True) }}"
+  tags: ldap_setup_tree,ldap_users,ldap_users_cn
+# Modify user: add mail addresses if it is defined
+- name: add mails for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      mail: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mail',skip_missing=True) }}"
+  tags: ldap_setup_tree,ldap_users,ldap_users_mail
+# Modify user: add photo if it is defined
+- name: add photo for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      photo:  "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.photo',skip_missing=True) }}"
+  tags: ldap_setup_tree,ldap_users,ldap_users_photo
+# Modify user: add mobile if it is defined
+- name: add mobile for user
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      mobile:  "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mobile',skip_missing=True) }}"
+  tags: ldap_setup_tree,ldap_users,ldap_users_mobile
+# Modify user: add ssh keys if it is defined
+- name: add ssh-keys support
+  block:
+    - name: add sshkeys objectclass for user
+      community.general.ldap_attrs:
+        dn: "{{ item.value.dn }}"
+        attributes:
+          objectClass: "ldapPublicKey"
+      loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+      tags: ldap_setup_tree,ldap_users,ldap_users_sshkeys
+    - name: add sshkeys for user
+      community.general.ldap_attrs:
+        dn: "{{ item.0.value.dn }}"
+        attributes:
+         sshPublicKey: "{{ item.1 }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.sshPublicKey',skip_missing=True) }}"
+      tags: ldap_setup_tree,ldap_users,ldap_users_sshkeys
+  when: ldap_sshkeys is defined and ldap_sshkeys | bool
+# Modify user: add primary group
+- name: add primary group for users
+  community.general.ldap_entry:
+    dn: "uid={{ item.key }},{{ ldap_groups_ou }}"
+    objectClass:
+      - "posixGroup"
+      - "account"
+    attributes:
+      uid: "{{ item.key }}"
+      memberUid: "{{ item.value.uidNumber }}"
+      gidNumber: "{{ item.value.uidNumber }}"
+  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  tags: ldap_setup_tree,ldap_users,ldap_primary_group
+# Modify user: add attributes for primary group
+- name: add additional attributes for account groups
+  community.general.ldap_attrs:
+    dn: "uid={{ item.0.key }},{{ ldap_groups_ou }}"
+    attributes:
+      seeAlso: "{{ item.0.value.seeAlso | default(omit) }}"
+      localityName: "{{ item.0.value.localityName | default(omit) }}"
+      organizationalUnitName: "{{ item.0.value.organizationalUnitName | default(omit) }}"
+      host: "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.host',skip_missing=True) }}"
+  tags: ldap_setup_tree,ldap_users,ldap_primary_group
+##=== END: USERS ===##
+

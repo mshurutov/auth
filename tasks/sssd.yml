@@ -22,26 +22,13 @@
     - restart sssd
   tags: auth_daemon_config,sssd_daemon_config
 
-- name: delete LDAP support from /etc/pam.d/ files
+- name: delete any modules support from /etc/pam.d/ files
   ansible.builtin.lineinfile:
     path: "/etc/pam.d/system-auth"
-    regexp: ".*pam_ldap.*"
+    regexp: "{{ item }}"
     state: absent
-  tags: auth_daemon_config,sssd_pam_config
-
-- name: delete Kerberos support from /etc/pam.d/ files
-  ansible.builtin.lineinfile:
-    path: "/etc/pam.d/system-auth"
-    regexp: ".*pam_krb5.*"
-    state: absent
-  tags: auth_daemon_config,sssd_pam_config
-
-- name: delete exist sss support from /etc/pam.d/ files
-  ansible.builtin.lineinfile:
-    path: "/etc/pam.d/system-auth"
-    regexp: ".*pam_sss.*"
-    state: absent
-  tags: auth_daemon_config,sssd_pam_config
+  loop: "{{ auth_disable_modules }}"
+  tags: auth_daemon_config,sssd_pam_config,sssd_pam_rm_mods
 
 - name: edit /etc/pam.d/system-auth
   ansible.builtin.lineinfile:
@@ -49,4 +36,4 @@
     line: "{{ item.line }}"
     insertbefore: "{{ item.regexp }}"
   loop: "{{ sss_pam_settings }}"
-  tags: auth_daemon_config,sssd_pam_config
+  tags: auth_daemon_config,sssd_pam_config,sssd_pam_add_mods

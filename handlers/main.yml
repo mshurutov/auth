@@ -110,3 +110,11 @@
     name: sshd
     state: reloaded
 
+- name: systemd daemon-reload
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: restart logind
+  ansible.builtin.systemd_service:
+    name: systemd-logind
+    state: restarted

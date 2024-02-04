@@ -1,0 +1,22 @@
+---
+
+- name: add groups to ldap
+  ansible.builtin.import_tasks: ldapgroups.yml
+  community.general.ldap_entry:
+    dn: "{{ item.0.value.dn }}"
+    objectClass:
+    - "posixGroup"
+    - "groupOfNames"
+    attributes:
+      cn: "{{ item.0.value.primarycn }}"
+      member: "{{ item.1 }}"
+      gidNumber: "{{ item.0.value.gidNumber }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_groups, wantlist=True) | subelements('value.member') }}"
+  tags: ldap_setup_tree,ldap_groups,ldap_groups_add
+- name: add members to groups
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      member: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_groups, wantlist=True) | subelements('value.member') }}"
+  tags: ldap_setup_tree,ldap_groups,ldap_groups_add,ldap_groups_add_members

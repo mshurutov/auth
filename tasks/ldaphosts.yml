@@ -1,0 +1,20 @@
+---
+
+- name: add hosts into LDAP DIT
+  community.general.ldap_entry:
+    dn: "{{ item.0.value.dn }}"
+    objectClass:
+    - "ipHost"
+    - "device"
+    attributes:
+      ipHostNumber: "{{ item.1 }}"
+      cn: "{{ item.0.key }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
+  tags: ldap_setup_tree,ldap_hosts,ldap_hosts_add
+- name: add other IP addresses
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      ipHostNumber: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) | subelements('value.host_ip') }}"
+  tags: ldap_setup_tree,ldap_hosts,ldap_hosts_add_addr

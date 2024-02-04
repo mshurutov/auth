@@ -1,0 +1,20 @@
+---
+
+- name: add services into LDAP DIT
+  community.general.ldap_entry:
+    dn: "{{ item.value.dn }}"
+    objectClass:
+    - "account"
+    attributes:
+      uid: "{{ item.key }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) }}"
+  when: ldap_services is defined
+  tags: ldap_setup_tree,ldap_services,ldap_service_add
+- name: add hosts addresses for services
+  community.general.ldap_attrs:
+    dn: "{{ item.0.value.dn }}"
+    attributes:
+      host: "{{ item.1 }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) | subelements('value.host') }}"
+  when: ldap_services is defined
+  tags: ldap_setup_tree,ldap_services,ldap_service_add_addr
