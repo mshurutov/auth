@@ -116,7 +116,7 @@
 {% endif %}
 {% if krb_client_aware_channel_bindings is defined %}
 	client_aware_channel_bindings = {{ krb_client_aware_channel_bindings }}
-	{% endif %}
+{% endif %}
 
 [realms]
 {% for kr in krb_realms %}
@@ -128,6 +128,7 @@
 {% for rule in kr.auth_to_local %}
 		auth_to_local = {{ rule }}
 {% endfor %}
+		auth_to_local = DEFAULT
 {% endif %}
 {% if kr.auth_to_local_names is defined %}
 {% for map in kr.auth_to_local_names %}

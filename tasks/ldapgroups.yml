@@ -1,7 +1,6 @@
 ---
 
 - name: add groups to ldap
-  ansible.builtin.import_tasks: ldapgroups.yml
   community.general.ldap_entry:
     dn: "{{ item.0.value.dn }}"
     objectClass:

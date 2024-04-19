@@ -1,9 +1,14 @@
 ---
 
+- name: set distro independed variables
+  ansible.builtin.include_vars:
+    file: "{{ auth_vars_dir }}/main.yml"
+  tags: auth_set_vars,auth_install
+
 - name: set distro depended variables
   ansible.builtin.include_vars:
     file: "{{ auth_vars_dir }}/{{ ansible_pkg_mgr }}.yml"
-  tags: auth_set_vars
+  tags: auth_set_vars,auth_install
 
 - name: install auth services
   ansible.builtin.package:
@@ -27,7 +32,7 @@
   when: ! stat_ssl_ca.stat.exists
   tags: auth_ssl_ca
 
-- name: setup LDAP server
+- name: setup authdb server (default OpenLDAP)
   ansible.builtin.include_tasks: "{{ auth_db }}.yml" 
   when: ldap_servers_group in group_names
   tags: auth_db_setup
@@ -54,12 +59,12 @@
   loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
-- name: configure auth service if auth_proto is not ldap (default krb5)
+- name: configure auth protocol if auth_proto is not ldap (default krb5)
   ansible.builtin.include_tasks: "{{ auth_proto }}.yml" 
   when: auth_proto != "ldap" and auth_proto != "freeipa"
   tags: auth_proto_setup
 
-- name: configure auth daemon if auth_daemon is not ldap (default sssd)
+- name: configure auth service if auth_daemon is not ldap (default sssd)
   ansible.builtin.include_tasks: "{{ auth_daemon }}.yml" 
   when: auth_daemon != "ldap" and auth_proto != "freeipa"
   tags: auth_daemon_setup
@@ -75,7 +80,6 @@
     - "^(passwd):([ \t]*).*(files).*$"
     - "^(shadow):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
     - "^(group):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
-    - "^(netgroup):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
   tags: auth_daemon_config
 
 - name: create directory for drop-in-unit file for systemd-logind

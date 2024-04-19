@@ -7,12 +7,12 @@
     dest: "{{ krb_common_config }}"
     owner: "root"
     group: "root"
-  tags: krb_config,krb_client_config
+  tags: krb_config,krb_client_config,krb_client_config_file
 
 #===== Server configuration: BEGIN =====
 - name: create server configs
   block:
-  - name: create /etc/krb5.conf
+  - name: create config for logrotate
     ansible.builtin.template:
       src: "{{ auth_templates_dir }}/krb5.logrotate.j2"
       dest: "/etc/logrotate.d/krb5"
@@ -141,12 +141,32 @@
     loop_control:
       loop_var: host
     tags: krb_add_principals,krb_add_principals_hosts
+# Host: root account principals for full hostname
+  - name: create principals in ldap for exist host names
+    community.general.ldap_attrs:
+      dn: "{{ host.value.dn }}"
+      attributes:
+        krbPrincipalName: "root/{{ host.key }}.{{ common_domain_name }}@{{ krb_default_realm }}"
+    loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+    loop_control:
+      loop_var: host
+    tags: krb_add_principals,krb_add_principals_hosts
 # Host: short hostname principals
   - name: create principals in ldap for exist host names
     community.general.ldap_attrs:
       dn: "{{ host.value.dn }}"
       attributes:
         krbPrincipalName: "host/{{ host.key }}@{{ krb_default_realm }}"
+    loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
+    loop_control:
+      loop_var: host
+    tags: krb_add_principals,krb_add_principals_hosts
+# Host: root account principals for short hostname
+  - name: create principals in ldap for exist host names
+    community.general.ldap_attrs:
+      dn: "{{ host.value.dn }}"
+      attributes:
+        krbPrincipalName: "root/{{ host.key }}"
     loop: "{{ lookup('ansible.builtin.dict', ldap_hosts, wantlist=True) }}"
     loop_control:
       loop_var: host
@@ -234,12 +254,12 @@
 ### Remove old records in system and ldap keytabs ###
   - name: clean old host records in system keytab file
     ansible.builtin.command: "kadmin.local ktrem -k {{ item.0.1 }} {{ item.1 }}/{{ item.0.0 }} all"
-    loop: "{{ [common_full_hostname,common_short_hostname] | product([krb_system_keytab,ldap_keytab_file ]) | product(['host','nfs','ldap']) | list }}"
+    loop: "{{ [common_full_hostname,common_short_hostname] | product([krb_system_keytab,ldap_keytab_file ]) | product(['host','nfs','ldap','root']) | list }}"
     tags: krb_client_kdc
 ### add host,ldap and nfs keys into system and ldap keytabs ###
   - name: add host key for FQDN into host keytab
     ansible.builtin.command: "kadmin.local ktadd -k {{ item.0.1 }} -norandkey {{ item.1 }}/{{ item.0.0 }}"
-    loop: "{{ [common_full_hostname,common_short_hostname] | product([krb_system_keytab,ldap_keytab_file ]) | product(['host','nfs','ldap']) | list }}"
+    loop: "{{ [common_full_hostname,common_short_hostname] | product([krb_system_keytab,ldap_keytab_file ]) | product(['host','nfs','ldap','root']) | list }}"
     when: not ( item.1 == 'nfs' and item.0.1 == ldap_keytab_file )
     tags: krb_client_kdc
 ### set right permissions to ldap keytab 
@@ -276,9 +296,19 @@
     ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab host/{{ hostvars[item]['common_full_hostname'] }}"
     loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
     tags: krb_client_config,krb_ktb4hosts
+# add key for root account for full hostname into system keytab on primary KDC
+  - name: add host key for short name into keytab on primary KDC
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab root/{{ hostvars[item]['common_full_hostname'] }}"
+    loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
+    tags: krb_client_config,krb_ktb4hosts
 # add key for short name into system keytab on primary KDC
   - name: add host key for short name into keytab on primary KDC
     ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab host/{{ hostvars[item]['common_short_hostname'] }}"
+    loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
+    tags: krb_client_config,krb_ktb4hosts
+# add key for root account for short name into system keytab on primary KDC
+  - name: add host key for short name into keytab on primary KDC
+    ansible.builtin.command: "kadmin.local ktadd -norandkey -k /tmp/kdc/{{ hostvars[item]['common_short_hostname'] }}.keytab root/{{ hostvars[item]['common_short_hostname'] }}"
     loop: "{{ query('inventory_hostnames', auth_no_kdc_group) }}"
     tags: krb_client_config,krb_ktb4hosts
   - name: add keys for NFS into system keytabs
