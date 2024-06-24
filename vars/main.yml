@@ -3,7 +3,9 @@
 krb_realms: "{{
   [ krb_realms_default | default([]),
     krb_realms_group_all | default([]),
+    krb_realms_supgroup | default([]),
     krb_realms_group | default([]),
+    krb_realms_supgroup | default([]),
     krb_realms_host | default([])
   ] |
   community.general.lists_mergeby(

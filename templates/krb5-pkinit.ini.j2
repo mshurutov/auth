@@ -1,0 +1,8 @@
+# temporary file for certificate generation for pkinit 
+{% for name,params in krb5_pkinit_sections.items() %}
+[{{ name }}]
+{% for key,value in params.items() %}
+key=value
+{% endfor %}
+
+{% endfor %}

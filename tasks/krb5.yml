@@ -12,6 +12,7 @@
 #===== Server configuration: BEGIN =====
 - name: create server configs
   block:
+# logrotate
   - name: create config for logrotate
     ansible.builtin.template:
       src: "{{ auth_templates_dir }}/krb5.logrotate.j2"
@@ -48,7 +49,8 @@
     with_fileglob:
       - "{{ auth_templates_dir }}/krb*.sh.j2"
     tags: krb_config,krb_kdc_config
-# The following tasks perform destructive actions, so they should only be executed when the appropriate flag is set.
+# The following tasks perform destructive actions,
+# so they should only be executed when the appropriate flag is set.
   - name: create any objects
     block:
 # Stash file: create it
@@ -73,7 +75,33 @@
       ansible.builtin.command: "/root/krb_mk.sh {{ ldap_krb_admin_password}}"
       when: common_full_hostname != common_primary_dc
       tags: krb_config,krb_kdc_config
-#=====  (Re)start KRB5 services =====
+#===== configure KRB5 services =====
+    - name: edit systemd unit files for KRB5 services
+      block:
+      - name: create override directories
+        ansible.builtin.file:
+          path: "/etc/systemd/system/{{ item }}.d"
+          state: directory
+        loop:
+        - "{{ krb_kdc_service }}"
+        - "{{ krb_kadmin_service }}"
+      - name: create override files for services
+        ansible.builtin.blockinfile:
+          path: "/etc/systemd/system/{{ item }}.d/override.conf"
+          create: true
+          block: |
+            [Unit]
+            Requires=slapd.service
+            After=slapd.service
+        loop:
+        - "{{ krb_kdc_service }}"
+        - "{{ krb_kadmin_service }}"
+      - name: daemons files reload
+        ansible.builtin.systemd_service:
+          daemon_reload: true
+      tags: krb_config,krb_kdc_config,krb_services_config
+      when: krb_krb5_db_type == "kldap" and ansible_service_mgr == "systemd"
+#===== (Re)start KRB5 services =====
 # KDC
     - name: restart kdc
       ansible.builtin.service:
