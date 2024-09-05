@@ -1,12 +1,11 @@
 ---
-
-- name: set short name for ldap_overlays.ldap_memberof.overlay
+- name: Set short name for ldap_overlays.ldap_memberof.overlay
   ansible.builtin.set_fact:
     lmo: "{{ ldap_overlays.ldap_memberof.overlay }}"
   when: common_full_hostname == common_primary_dc
   tags: ldap_setup_memberof
 
-- name: add entry of memberof overlay into LDAP
+- name: Add entry of memberof overlay into LDAP
   community.general.ldap_entry:
     dn: "{{ lmo.dn }}"
     objectClass:

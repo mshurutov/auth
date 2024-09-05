@@ -1,6 +1,5 @@
 ---
-
-- name: add groups to ldap
+- name: Add groups to ldap
   community.general.ldap_entry:
     dn: "{{ item.0.value.dn }}"
     objectClass:
@@ -12,7 +11,7 @@
       gidNumber: "{{ item.0.value.gidNumber }}"
   loop: "{{ lookup('ansible.builtin.dict', ldap_groups, wantlist=True) | subelements('value.member') }}"
   tags: ldap_setup_tree,ldap_groups,ldap_groups_add
-- name: add members to groups
+- name: Add members to groups
   community.general.ldap_attrs:
     dn: "{{ item.0.value.dn }}"
     attributes:

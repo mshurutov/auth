@@ -1,6 +1,5 @@
 ---
-
-- name: add sudo entries to ldap
+- name: Add sudo entries to ldap
   community.general.ldap_entry:
     dn: "{{ item.value.dn }}"
     objectClass:
@@ -10,14 +9,14 @@
       description: "{{ item.value.description | default(omit) }}"
   loop: "{{  lookup('ansible.builtin.dict', ldap_sudo, wantlist=True) }}"
   tags: ldap_setup_tree,ldap_setup_sudo,ldap_sudo_add
-- name: change sudoOption of sudo_ldap entries
+- name: Change sudoOption of sudo_ldap entries
   community.general.ldap_attrs:
     dn: "{{ item.0.value.dn }}"
     attributes:
       sudoOption: "{{ item.1 | default (omit) }}"
   loop: "{{  lookup('ansible.builtin.dict', ldap_sudo, wantlist=True) | subelements('value.sudoOption',skip_missing=True) }}"
   tags: ldap_setup_tree,ldap_setup_sudo,ldap_sudo_options
-- name: change attributes of sudo_ldap entries
+- name: Change attributes of sudo_ldap entries
   community.general.ldap_attrs:
     dn: "{{ item.value.dn }}"
     attributes:

@@ -1,28 +1,37 @@
 ---
+- name: Check if ansible version is equal or greater than 2.11
+  ansible.builtin.fail:
+    msg: "Ansible core should be equal or greater than 2.11"
+  when: ansible_version.full is ansible.builtin.version('2.11','<')
 
-- name: set distro independed variables
+- name: Check if python is equal or greater than 3
+  ansible.builtin.fail:
+    msg: "Python should be equal or greater than 3"
+  when: ansible_python.version.major is ansible.builtin.version('3','<')
+
+- name: Set distro independed variables
   ansible.builtin.include_vars:
     file: "{{ auth_vars_dir }}/main.yml"
   tags: auth_set_vars,auth_install
 
-- name: set distro depended variables
+- name: Set distro depended variables
   ansible.builtin.include_vars:
     file: "{{ auth_vars_dir }}/{{ ansible_pkg_mgr }}.yml"
   tags: auth_set_vars,auth_install
 
-- name: install auth services
+- name: Install auth services
   ansible.builtin.package:
     name: "{{ auth_packages }}"
     state: present
   tags: auth_install
 
-- name: check if local CA is exist on target host
+- name: Check if local CA is exist on target host
   ansible.builtin.stat:
     path: "{{ common_ssl_CA }}"
   register: stat_ssl_ca
   tags: auth_ssl_ca
 
-- name: copy root CA to target host
+- name: Copy root CA to target host
   ansible.builtin.copy:
     src: "{{ common_local_store }}/{{ common_domain_name }}-ssl-ca.pem"
     dest: "{{ common_ssl_CA }}"
@@ -32,12 +41,12 @@
   when: ! stat_ssl_ca.stat.exists
   tags: auth_ssl_ca
 
-- name: setup authdb server (default OpenLDAP)
+- name: Setup authdb server (default OpenLDAP)
   ansible.builtin.include_tasks: "{{ auth_db }}.yml" 
   when: ldap_servers_group in group_names
   tags: auth_db_setup
 
-- name: edit {{ ldap_config_dir }}/ldap.conf (system config)
+- name: Edit {{ ldap_config_dir }}/ldap.conf (system config)
   ansible.builtin.lineinfile:
     path:  "{{ ldap_config_dir }}/ldap.conf"
     regexp: "^[\t ]*#?[\t ]*{{ item.key }}.*"
@@ -47,7 +56,7 @@
   loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
-- name: edit /etc/ldap.conf (any services and users config)
+- name: Edit /etc/ldap.conf (any services and users config)
   ansible.builtin.lineinfile:
     path:  "/etc/ldap.conf"
     line: "{{ item.key }} {{ item.value }}"
@@ -59,17 +68,17 @@
   loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
-- name: configure auth protocol if auth_proto is not ldap (default krb5)
+- name: Configure auth protocol if auth_proto is not ldap (default krb5)
   ansible.builtin.include_tasks: "{{ auth_proto }}.yml" 
   when: auth_proto != "ldap" and auth_proto != "freeipa"
   tags: auth_proto_setup
 
-- name: configure auth service if auth_daemon is not ldap (default sssd)
+- name: Configure auth service if auth_daemon is not ldap (default sssd)
   ansible.builtin.include_tasks: "{{ auth_daemon }}.yml" 
   when: auth_daemon != "ldap" and auth_proto != "freeipa"
   tags: auth_daemon_setup
 
-- name: add passwd/shadow/group over {{ auth_daemon }} into /etc/nsswitch.conf
+- name: Add passwd/shadow/group over {{ auth_daemon }} into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "{{ item }}"
@@ -82,7 +91,7 @@
     - "^(group):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
   tags: auth_daemon_config
 
-- name: create directory for drop-in-unit file for systemd-logind
+- name: Create directory for drop-in-unit file for systemd-logind
   ansible.builtin.file:
     path: "/etc/systemd/system/systemd-logind.service.d/"
     state: directory
@@ -101,7 +110,7 @@
   - restart logind
   tags: logind_set
 
-- name: add sudo over ldap into /etc/nsswitch.conf
+- name: Add sudo over ldap into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "^ *#? *sudoers"

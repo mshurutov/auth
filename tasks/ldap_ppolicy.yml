@@ -1,14 +1,13 @@
 ---
-
 # Add password policy into ldap
-- name: set password encryption function
+- name: Set password encryption function
   community.general.ldap_attrs:
     dn: "olcDatabase={-1}frontend,cn=config"
     attributes:
       olcPasswordHash: "{{ ldap_pass_enc_func }}"
   tags: ldap_setup_ppolicy
   
-- name: set password encryption format
+- name: Set password encryption format
   community.general.ldap_attrs:
     dn: "cn=config"
     attributes:
@@ -17,23 +16,23 @@
   when: ldap_pass_enc_func == '{CRYPT}'
   tags: ldap_setup_ppolicy
 
-- name: set short name for ldap_overlays.ldap_ppolicy.overlay
+- name: Set short name for ldap_overlays.ldap_ppolicy.overlay
   ansible.builtin.set_fact:
     lppo: "{{ ldap_overlays.ldap_ppolicy.overlay }}"
   tags: ldap_setup_ppolicy
 
-- name: set short name for ldap_overlays.ldap_ppolicy.policy
+- name: Set short name for ldap_overlays.ldap_ppolicy.policy
   ansible.builtin.set_fact:
     lppp: "{{ ldap_overlays.ldap_ppolicy.policy }}"
   tags: ldap_setup_ppolicy
 
-- name: search for ppolicy overlay in ldap
+- name: Search for ppolicy overlay in ldap
   ansible.builtin.command: 'ldapsearch -LLLQ -Y EXTERNAL -H ldapi:/// -b cn=config "olcOverlay=ppolicy"'
   register: lppo_exists
   check_mode: no
   tags: ldap_setup_ppolicy
 
-- name: add entry of ppolicy overlay into LDAP
+- name: Add entry of ppolicy overlay into LDAP
   community.general.ldap_entry:
     dn: "{{ lppo.dn }}"
     objectClass:
@@ -49,7 +48,7 @@
   when: lppo_exists.stdout == ""
   tags: ldap_setup_ppolicy
 
-- name: add entry of default password policy into ldap
+- name: Add entry of default password policy into ldap
   community.general.ldap_entry:
     dn: "{{ lppp.dn }}"
     objectClass:
@@ -62,7 +61,7 @@
       pwdAttribute: "{{ lppp.attrs.pwdAttribute | default('userPassword') }}"
   tags: ldap_setup_ppolicy
 
-- name: add ppolicy attrs
+- name: Add ppolicy attrs
   community.general.ldap_attrs:
     dn: "{{ lppp.dn }}"
     attributes:
@@ -82,16 +81,16 @@
       pwdSafeModify: "{{ lppp.attrs.pwdSafeModify | default(omit) }}"
   tags: ldap_setup_ppolicy
 
-- name: set pwdCheckModule
+- name: Set pwdCheckModule
   block:
-    - name: set pwdCheckModule prior 2.6 version
+    - name: Set pwdCheckModule prior 2.6 version
       community.general.ldap_attrs:
         dn: "{{ lppp.dn }}"
         attributes:
           pwdCheckModule: "{{ lppp.attrs.pwdCheckModule | default(omit) }}"
       when: ldap_version <= 2.5
       tags: ldap_setup_ppolicy
-    - name: set pwdCheckModule since 2.6 version
+    - name: Set pwdCheckModule since 2.6 version
       community.general.ldap_attrs:
         dn: "{{ lppo.dn }}"
         attributes:

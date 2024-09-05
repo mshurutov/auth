@@ -1,22 +1,21 @@
 ---
-
-- name: add Kerberos Container
+- name: Add Kerberos Container
   community.general.ldap_entry:
     dn: "{{ ldap_krb_pack }}"
     objectClass:
     - "krbContainer"
   tags: ldap_setup_tree,ldap_setup_krb,ldap_krb_add
-- name: get max number of ACL
+- name: Get max number of ACL
   ansible.builtin.shell: ldapsearch -QLLLY EXTERNAL -H ldapi:/// -b olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config | awk '/^olcAccess/ {a=gensub(/.*\{([0-9]+)\}.*/,"\\1","g",$0); if ( a > b ) b=a; } END { print b }'
   register: acl_max_number
   check_mode: no
   tags: ldap_setup_tree,ldap_setup_krb,ldap_krb_acl
-- name: check if ACL exists
+- name: Check if ACL exists
   ansible.builtin.shell: "ldapsearch -QLLLY EXTERNAL -H ldapi:/// -b olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config | awk '/to dn.subtree=\"cn=kerberos,ou=baseservices,dc=mshurutov,dc=home\"/ {print}'"
   register: acl_exist
   check_mode: no
   tags: ldap_setup_tree,ldap_setup_krb,ldap_krb_acl
-- name: add access rights to Kerberos container
+- name: Add access rights to Kerberos container
   community.general.ldap_attrs:
     dn: "{{ ldap_db_dn }}"
     attributes:
