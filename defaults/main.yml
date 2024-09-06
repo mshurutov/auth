@@ -1,5 +1,4 @@
 ---
-
 # Common parameters for all tasks in role
 auth_db: "openldap" # default is OpenLDAP, may be any others LDAP servers, ex. FreeIPA
 auth_proto: "krb5" # authentication protocol, may be ldap or FreeIPA
@@ -12,40 +11,40 @@ auth_vars_dir: "{{ role_path }}/vars"
 auth_admin_path: "/usr/loca/sbin"
 # settings for install need services (default distro - Gentoo)
 auth_packages:
-auth_portage_packages: 
-#- "net-nds/openldap"
-#- "dev-python/python-ldap"
-#- "dev-python/cryptography"
-#- "sys-auth/sssd"
-#- "app-crypt/mit-krb5"
-#- "dev-tcltk/expect"
-#- "sys-auth/pam_krb5"
+auth_portage_packages:
+#  - "net-nds/openldap"
+#  - "dev-python/python-ldap"
+#  - "dev-python/cryptography"
+#  - "sys-auth/sssd"
+#  - "app-crypt/mit-krb5"
+#  - "dev-tcltk/expect"
+#  - "sys-auth/pam_krb5"
 auth_apt_packages:
-#- "slapd"
-#- "slapd-contrib"
-#- "ldap-utils"
-#- "krb5-kpropd"
-#- "krb5-admin-server"
-#- "krb5-k5tls"
-#- "krb5-doc"
-#- "krb5-kdc"
-#- "krb5-kdc-ldap"
-#- "libsasl2-modules-gssapi-mit"
-#- "sssd-ldap"
-#- "sssd-idp"
-#- "sssd-krb5"
-#- "libsss-sudo"
-#- "sssd-tools"
-#- "libsasl2-modules-ldap"
+#  - "slapd"
+#  - "slapd-contrib"
+#  - "ldap-utils"
+#  - "krb5-kpropd"
+#  - "krb5-admin-server"
+#  - "krb5-k5tls"
+#  - "krb5-doc"
+#  - "krb5-kdc"
+#  - "krb5-kdc-ldap"
+#  - "libsasl2-modules-gssapi-mit"
+#  - "sssd-ldap"
+#  - "sssd-idp"
+#  - "sssd-krb5"
+#  - "libsss-sudo"
+#  - "sssd-tools"
+#  - "libsasl2-modules-ldap"
 auth_disable_modules:
-- ".*pam_ldap.*"
-- ".*pam_krb5.*"
-- ".*pam_sss.*"
-- ".*pam_systemd.*"
+  - ".*pam_ldap.*"
+  - ".*pam_krb5.*"
+  - ".*pam_sss.*"
+  - ".*pam_systemd.*"
 # System settings for ldap part: files and dirs, system users and groups, connection info etc
 ldap_version: "2.6"
 # Files and directories. May be distribution-depended, so there is should be specified.
-# File for override systemd unit parameters 
+# File for override systemd unit parameters
 slapd_service_file: "/etc/systemd/system/slapd.service.d/00gentoo.conf"
 # Base config directory. Other configs store in this place.
 ldap_config_dir: "/etc/openldap"
@@ -88,7 +87,7 @@ ldap_unit_params:
   - regexp: '^Environment=.*SLAPD_URLS'
     line: 'Environment="SLAPD_URLS=ldaps:/// ldapi:///"' # disable unencrypted connect
 # Parameters for logrotate
-ldap_logrotate_period : "daily"
+ldap_logrotate_period: "daily"
 ldap_logrotate_number: "4"
 
 
@@ -111,10 +110,10 @@ ldap_schema_only:
 # Log settings
 ldap_loglevel: "stats stats2"
 # Database settings: size,type,DN
-ldap_db_config_max_size: 1073741824 
+ldap_db_config_max_size: 1073741824
 ldap_config_db_type: "mdb"
 ldap_db_data_number: 1
-# This parameter with previous has value "olcDatabase={1}mdb,cn=config" 
+# This parameter with previous has value "olcDatabase={1}mdb,cn=config"
 ldap_db_dn: "olcDatabase={{ '{' }}{{ ldap_db_data_number }}{{ '}' }}{{ ldap_config_db_type }},cn=config"
 # Base LDAP parameters. Should be redefined.
 ldap_base_name: "mycompany"
@@ -138,7 +137,7 @@ ldap_password_crypt_format: "$6$%.16s"
 # Other attributes owner and member of {{ ldap_ops_group }} can change, other can read.
 ldap_bs_acl:
   - '{0}to attrs=userPassword
-    by self write 
+    by self write
     by anonymous auth
     by group.exact="{{ ldap_ops_group }}" write
     by * none'
@@ -208,7 +207,7 @@ krb_saslsecprops: "noanonymous,noplain"
 krb_logrotate_period: "daily"
 krb_logrotate_number: "4"
 # Example of krb_appdefaults (this settings is not tested!)
-#krb_appdefaults:
+# krb_appdefaults:
 #  apps:
 #    app1:
 #      name: telnet
@@ -246,7 +245,7 @@ sssd_domains_default:
   - name: "{{ common_domain_name }}"
     options:
       id_provider: "ldap"
-      auth_provider: "krb5" 
+      auth_provider: "krb5"
       selinux_provider: "none"
       ldap_search_base: "{{ ldap_base_suffix }}"
       ldap_tls_cacert: "{{ common_ssl_CA }}"
@@ -260,8 +259,8 @@ sssd_services_default:
       filter_users: "adm,bin,daemon,root"
   - name: "pam"
 sss_pam_settings:
-    - { regexp: "^auth.*pam_unix.so.*nullok", line: "auth\t\tsufficient\tpam_sss.so" }
-    - { regexp: "^account.*pam_unix.so.*", line: "account\t\tsufficient\tpam_sss.so" }
-    - { regexp: "^password.*pam_unix.so.*", line: "password\tsufficient\tpam_sss.so use_authtok" }
-    - { regexp: "^session.*pam_unix.so.*", line: "session\t\tsufficient\tpam_sss.so" }
-    - { regexp: "^session.*pam_sss.so.*", line: "session\t\toptional\tpam_systemd.so" }
+  - { regexp: "^auth.*pam_unix.so.*nullok", line: "auth\t\tsufficient\tpam_sss.so" }
+  - { regexp: "^account.*pam_unix.so.*", line: "account\t\tsufficient\tpam_sss.so" }
+  - { regexp: "^password.*pam_unix.so.*", line: "password\tsufficient\tpam_sss.so use_authtok" }
+  - { regexp: "^session.*pam_unix.so.*", line: "session\t\tsufficient\tpam_sss.so" }
+  - { regexp: "^session.*pam_sss.so.*", line: "session\t\toptional\tpam_systemd.so" }

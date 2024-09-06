@@ -3,7 +3,7 @@
   community.general.ldap_entry:
     dn: "{{ item.value.dn }}"
     objectClass:
-    - "account"
+      - "account"
     attributes:
       uid: "{{ item.key }}"
   loop: "{{ lookup('ansible.builtin.dict', ldap_services, wantlist=True) }}"

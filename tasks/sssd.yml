@@ -1,21 +1,11 @@
 ---
-- name: Set sssd_services from host, group, all groups and default values
-  set_fact:
-    sssd_services: "{{ sssd_services_default | community.general.lists_mergeby(sssd_services_group_all | default([]), sssd_services_group | default([]), sssd_services_host | default([]), 'name', recursive=true) }}"
-  tags: auth_daemon_config,sssd_daemon_config,sssd_pam_config
-
-- name: Set sssd_domains from group and default values
-  set_fact:
-    sssd_domains: "{{ sssd_domains_default | community.general.lists_mergeby(sssd_domains_group | default([]), 'name', recursive=true)}}"
-  tags: auth_daemon_config,sssd_daemon_config,sssd_pam_config
-
 - name: Copy sssd.conf to target host
   ansible.builtin.template:
     src: "{{ auth_templates_dir }}/sssd.conf.j2"
     dest: "/etc/sssd/sssd.conf"
     owner: "root"
     group: "root"
-    mode: 0600
+    mode: "0600"
   notify:
     - enable sssd
     - restart sssd

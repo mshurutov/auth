@@ -1,16 +1,30 @@
 ---
 # vars file for ldap
 krb_realms: "{{
-  [ krb_realms_default | default([]),
+  [krb_realms_default | default([]),
     krb_realms_group_all | default([]),
     krb_realms_supgroup | default([]),
     krb_realms_group | default([]),
     krb_realms_supgroup | default([]),
-    krb_realms_host | default([])
-  ] |
-  community.general.lists_mergeby(
-    'realm',
+    krb_realms_host | default([])] |
+  community.general.lists_mergeby('realm',
     recursive=true,
-    list_merge='append_rp'
-  )
+    list_merge='append_rp')
+}}"
+sssd_services: "{{
+  sssd_services_default |
+  community.general.lists_mergeby(sssd_services_group_all | default([]),
+    sssd_services_supgroup | default([]),
+    sssd_services_group | default([]),
+    sssd_services_subgroup | default([]),
+    sssd_services_host | default([]),
+    'name', recursive=true)
+}}"
+sssd_domains: "{{
+  sssd_domains_default |
+  community.general.lists_mergeby(sssd_domains_group_all | default([]),
+    sssd_domains_supgroup | default([]),
+    sssd_domains_group | default([]),
+    sssd_domains_subgroup | default([]),
+    'name', recursive=true)
 }}"

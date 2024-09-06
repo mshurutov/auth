@@ -1,4 +1,3 @@
 ---
-
 # apt-based variables
 auth_packages: "{{ auth_apt_packages }}"

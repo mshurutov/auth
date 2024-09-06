@@ -37,28 +37,29 @@
     dest: "{{ common_ssl_CA }}"
     owner: "root"
     group: "root"
-    mode: 0644
+    mode: "0644"
   when: ! stat_ssl_ca.stat.exists
   tags: auth_ssl_ca
 
 - name: Setup authdb server (default OpenLDAP)
-  ansible.builtin.include_tasks: "{{ auth_db }}.yml" 
+  ansible.builtin.include_tasks: "{{ auth_db }}.yml"
   when: ldap_servers_group in group_names
   tags: auth_db_setup
 
-- name: Edit {{ ldap_config_dir }}/ldap.conf (system config)
+- name: Edit ldap.conf (system config)
   ansible.builtin.lineinfile:
-    path:  "{{ ldap_config_dir }}/ldap.conf"
+    path: "{{ ldap_config_dir }}/ldap.conf"
     regexp: "^[\t ]*#?[\t ]*{{ item.key }}.*"
     line: "{{ item.key }} {{ item.value }}"
     state: present
     create: true
+    mode: "0644"
   loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
   tags: ldap_client_config
 
 - name: Edit /etc/ldap.conf (any services and users config)
   ansible.builtin.lineinfile:
-    path:  "/etc/ldap.conf"
+    path: "/etc/ldap.conf"
     line: "{{ item.key }} {{ item.value }}"
     state: present
     owner: 'root'
@@ -69,32 +70,33 @@
   tags: ldap_client_config
 
 - name: Configure auth protocol if auth_proto is not ldap (default krb5)
-  ansible.builtin.include_tasks: "{{ auth_proto }}.yml" 
+  ansible.builtin.include_tasks: "{{ auth_proto }}.yml"
   when: auth_proto != "ldap" and auth_proto != "freeipa"
   tags: auth_proto_setup
 
 - name: Configure auth service if auth_daemon is not ldap (default sssd)
-  ansible.builtin.include_tasks: "{{ auth_daemon }}.yml" 
+  ansible.builtin.include_tasks: "{{ auth_daemon }}.yml"
   when: auth_daemon != "ldap" and auth_proto != "freeipa"
   tags: auth_daemon_setup
 
-- name: Add passwd/shadow/group over {{ auth_daemon }} into /etc/nsswitch.conf
+- name: Add passwd/shadow/group over auth_daemon into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "{{ item }}"
-    line: '\1:\2{{ auth_daemon | regex_replace("sssd","sss") }} \3'
+    line: '\1:\2{{ auth_daemon | regex_replace("sssd", "sss") }} \3'
     state: present
-    backrefs: yes
+    backrefs: true
   loop:
-    - "^(passwd):([ \t]*).*(files).*$"
-    - "^(shadow):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
-    - "^(group):([ \t]*).*(files([ \t][[][^]]*[\\]])?).*$"
+    - '^(passwd):(\s*).*(files).*$'
+    - '^(shadow):(\s*).*(files(\s[[][^]]*[\\]])?).*$'
+    - '^(group):(\s*).*(files(\s[[][^]]*[\\]])?).*$'
   tags: auth_daemon_config
 
 - name: Create directory for drop-in-unit file for systemd-logind
   ansible.builtin.file:
     path: "/etc/systemd/system/systemd-logind.service.d/"
     state: directory
+    mode: "0644"
   tags: logind_set
 - name: Allow logind use network connections
   ansible.builtin.blockinfile:
@@ -105,16 +107,17 @@
       ProtectHostname=no
     create: true
     path: "/etc/systemd/system/systemd-logind.service.d/override.conf"
+    mode: "0644"
   notify:
-  - systemd daemon-reload
-  - restart logind
+    - systemd daemon-reload
+    - restart logind
   tags: logind_set
 
 - name: Add sudo over ldap into /etc/nsswitch.conf
   ansible.builtin.lineinfile:
     path: "/etc/nsswitch.conf"
     regexp: "^ *#? *sudoers"
-    line: "sudoers:    {{ auth_daemon | regex_replace(\"sssd\",\"sss\") }} files"
+    line: "sudoers:    {{ auth_daemon | regex_replace(\"sssd\", \"sss\") }} files"
     state: present
   when: ldap_sudo is defined
   tags: ldap_client_config,ldap_setup_sudo

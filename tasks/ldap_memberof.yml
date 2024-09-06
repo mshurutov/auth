@@ -12,11 +12,11 @@
       - "olcOverlayConfig"
       - "olcMemberOf"
     attributes:
-        olcMemberOfGroupOC: "{{ lmo.attrs.olcMemberOfGroupOC }}"
-        olcMemberOfMemberAD: "{{ lmo.attrs.olcMemberOfMemberAD }}"
-        olcMemberOfMemberOfAD: "{{ lmo.attrs.olcMemberOfMemberOfAD }}"
-        olcMemberOfDangling: "{{ lmo.attrs.olcMemberOfDangling | default(omit) }}"
-        olcMemberOfDanglingError: "{{ lmo.attrs.olcMemberOfDanglingError | default(omit) }}"
-        olcMemberOfRefInt: "{{ lmo.attrs.olcMemberOfRefInt }}"
+      olcMemberOfGroupOC: "{{ lmo.attrs.olcMemberOfGroupOC }}"
+      olcMemberOfMemberAD: "{{ lmo.attrs.olcMemberOfMemberAD }}"
+      olcMemberOfMemberOfAD: "{{ lmo.attrs.olcMemberOfMemberOfAD }}"
+      olcMemberOfDangling: "{{ lmo.attrs.olcMemberOfDangling | default(omit) }}"
+      olcMemberOfDanglingError: "{{ lmo.attrs.olcMemberOfDanglingError | default(omit) }}"
+      olcMemberOfRefInt: "{{ lmo.attrs.olcMemberOfRefInt }}"
   when: common_full_hostname == common_primary_dc
   tags: ldap_setup_memberof

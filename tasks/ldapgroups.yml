@@ -3,8 +3,8 @@
   community.general.ldap_entry:
     dn: "{{ item.0.value.dn }}"
     objectClass:
-    - "posixGroup"
-    - "groupOfNames"
+      - "posixGroup"
+      - "groupOfNames"
     attributes:
       cn: "{{ item.0.value.primarycn }}"
       member: "{{ item.1 }}"

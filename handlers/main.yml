@@ -1,120 +1,119 @@
 ---
-
 # Handlers for slapd service
-- name: enable slapd
+- name: Enable slapd
   ansible.builtin.service:
     name: slapd
-    enabled: yes
+    enabled: true
 
-- name: disable slapd
+- name: Disable slapd
   ansible.builtin.service:
     name: slapd
-    enabled: no
+    enabled: false
 
-- name: start slapd
+- name: Start slapd
   ansible.builtin.service:
     name: slapd
     state: started
 
-- name: stop slapd
+- name: Stop slapd
   ansible.builtin.service:
     name: slapd
     state: stopped
 
-- name: restart slapd
+- name: Restart slapd
   ansible.builtin.service:
     name: slapd
     state: restarted
 
 # handlers for sssd service
-- name: enable sssd
+- name: Enable sssd
   ansible.builtin.service:
     name: sssd
-    enabled: yes
+    enabled: true
 
-- name: disable sssd
+- name: Disable sssd
   ansible.builtin.service:
     name: sssd
-    enabled: no
+    enabled: false
 
-- name: start sssd
+- name: Start sssd
   ansible.builtin.service:
     name: sssd
     state: started
 
-- name: stop sssd
+- name: Stop sssd
   ansible.builtin.service:
     name: sssd
     state: stopped
 
-- name: restart sssd
+- name: Restart sssd
   ansible.builtin.service:
     name: sssd
     state: restarted
 
 # handlers file for krb services
 # start,enable,restart,stop disable
-- name: enable kdc
+- name: Enable kdc
   ansible.builtin.service:
     name: mit-krb5kdc
-    enabled: yes
+    enabled: true
 
-- name: enable kadmind
+- name: Enable kadmind
   ansible.builtin.service:
     name: mit-krb5kadmind
-    enabled: yes
+    enabled: true
 
-- name: start kdc
+- name: Start kdc
   ansible.builtin.service:
     name: mit-krb5kdc
     state: started
 
-- name: start kadmind
+- name: Start kadmind
   ansible.builtin.service:
     name: mit-krb5kadmind
     state: started
 
-- name: restart kdc
+- name: Restart kdc
   ansible.builtin.service:
     name: mit-krb5kdc
     state: restarted
 
-- name: restart kadmind
+- name: Restart kadmind
   ansible.builtin.service:
     name: mit-krb5kadmind
     state: restarted
 
-- name: stop kdc
+- name: Stop kdc
   ansible.builtin.service:
     name: mit-krb5kdc
     state: stopped
 
-- name: stop kadmind
+- name: Stop kadmind
   ansible.builtin.service:
     name: mit-krb5kadmind
     state: stopped
 
-- name: disable kdc
+- name: Disable kdc
   ansible.builtin.service:
     name: mit-krb5kdc
-    enabled: no
+    enabled: false
 
-- name: disable kadmind
+- name: Disable kadmind
   ansible.builtin.service:
     name: mit-krb5kadmind
-    enabled: no
+    enabled: false
 
 # misc services
-- name: reload sshd
+- name: Reload sshd
   ansible.builtin.service:
     name: sshd
     state: reloaded
 
-- name: systemd daemon-reload
+- name: Systemd daemon-reload
   ansible.builtin.systemd_service:
     daemon_reload: true
 
-- name: restart logind
+- name: Restart logind
   ansible.builtin.systemd_service:
     name: systemd-logind
     state: restarted

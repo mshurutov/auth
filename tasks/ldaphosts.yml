@@ -3,8 +3,8 @@
   community.general.ldap_entry:
     dn: "{{ item.0.value.dn }}"
     objectClass:
-    - "ipHost"
-    - "device"
+      - "ipHost"
+      - "device"
     attributes:
       ipHostNumber: "{{ item.1 }}"
       cn: "{{ item.0.key }}"

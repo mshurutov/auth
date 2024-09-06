@@ -56,7 +56,7 @@
       preferredLanguage: "{{ item.value.preferredLanguage | default(omit) }}"
       userSMIMECertificate: "{{ item.value.userSMIMECertificate | default(omit) }}"
       userPKCS12: "{{ item.value.userPKCS12 | default(omit) }}"
-  loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
   tags: ldap_setup_tree,ldap_users
 # Modify user: add password if it is defined
 - name: Add password for every user
@@ -66,7 +66,7 @@
     attributes:
       userPassword: "{{ item.value.userPassword | default(omit) }}"
   loop: "{{  lookup('ansible.builtin.dict', ldap_users, wantlist=True) }}"
-  ignore_errors: true
+  failed_when: true
   tags: ldap_setup_tree,ldap_users,ldap_users_pwd
 # Modify user: add cn's if it is defined
 - name: Add cn's for user
@@ -74,7 +74,7 @@
     dn: "{{ item.0.value.dn }}"
     attributes:
       cn: "{{ item.1 }}"
-  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.cn',skip_missing=True) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.cn', skip_missing=True) }}"
   tags: ldap_setup_tree,ldap_users,ldap_users_cn
 # Modify user: add mail addresses if it is defined
 - name: Add mails for user
@@ -82,26 +82,27 @@
     dn: "{{ item.0.value.dn }}"
     attributes:
       mail: "{{ item.1 }}"
-  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mail',skip_missing=True) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mail', skip_missing=True) }}"
   tags: ldap_setup_tree,ldap_users,ldap_users_mail
 # Modify user: add photo if it is defined
 - name: Add photo for user
   community.general.ldap_attrs:
     dn: "{{ item.0.value.dn }}"
     attributes:
-      photo:  "{{ item.1 | default(omit) }}"
-  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.photo',skip_missing=True) }}"
+      photo: "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.photo', skip_missing=True) }}"
   tags: ldap_setup_tree,ldap_users,ldap_users_photo
 # Modify user: add mobile if it is defined
 - name: Add mobile for user
   community.general.ldap_attrs:
     dn: "{{ item.0.value.dn }}"
     attributes:
-      mobile:  "{{ item.1 | default(omit) }}"
-  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mobile',skip_missing=True) }}"
+      mobile: "{{ item.1 | default(omit) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.mobile', skip_missing=True) }}"
   tags: ldap_setup_tree,ldap_users,ldap_users_mobile
 # Modify user: add ssh keys if it is defined
 - name: Add ssh-keys support
+  when: ldap_sshkeys is defined and ldap_sshkeys | bool
   block:
     - name: Add sshkeys objectclass for user
       community.general.ldap_attrs:
@@ -114,10 +115,9 @@
       community.general.ldap_attrs:
         dn: "{{ item.0.value.dn }}"
         attributes:
-         sshPublicKey: "{{ item.1 }}"
-      loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.sshPublicKey',skip_missing=True) }}"
+          sshPublicKey: "{{ item.1 }}"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.sshPublicKey', skip_missing=True) }}"
       tags: ldap_setup_tree,ldap_users,ldap_users_sshkeys
-  when: ldap_sshkeys is defined and ldap_sshkeys | bool
 # Modify user: add primary group
 - name: Add primary group for users
   community.general.ldap_entry:
@@ -140,7 +140,6 @@
       localityName: "{{ item.0.value.localityName | default(omit) }}"
       organizationalUnitName: "{{ item.0.value.organizationalUnitName | default(omit) }}"
       host: "{{ item.1 | default(omit) }}"
-  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.host',skip_missing=True) }}"
+  loop: "{{ lookup('ansible.builtin.dict', ldap_users, wantlist=True) | subelements('value.host', skip_missing=True) }}"
   tags: ldap_setup_tree,ldap_users,ldap_primary_group
-##=== END: USERS ===##
-
+# === END: USERS === #

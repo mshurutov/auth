@@ -1,136 +1,140 @@
 ---
-
 - name: Configure auth daemons
   ansible.builtin.lineinfile:
     path: "{{ item.path }}"
     regexp: '{{ item.regexp }}'
     line: '{{ item.line }}'
     state: present
-    backrefs: yes
+    backrefs: true
   loop: "{{ ldap_service_config }}"
   when: ldap_service_config is defined and ldap_service_config | length > 0
   tags: ldap_service_config
-## Copy initial ldif
+# Copy initial ldif
 - name: Copy templates to target host
   ansible.builtin.template:
     src: "{{ auth_templates_dir }}/slapd.logrotate.j2"
     dest: /etc/logrotate.d/slapd
+    mode: "0644"
   tags: ldap_service_config,ldap_service_logrotate
-### Init ldap service ###
-## Process of init is: stop slapd if started; delete config and db dirs;
-## copy schemas *.ldif into server; create tmpdir; copy template of init.ldif to created dir
-## create config and db dirs; init ldap service by exec command slapadd
-## there is "ldap_init_force" should be defined as true for this set of tasks
-- name: Init openldap service 
-  block:
-## Stop slapd service
-  - name: Check if slapd stopped
-    ansible.builtin.service:
-      name: slapd
-      state: stopped
-    tags: ldap_init,slapd_stop
-  - name: Configure auth daemons
-    ansible.builtin.lineinfile:
-      path: "{{ item.path }}"
-      regexp: '{{ item.regexp }}'
-      line: '{{ item.line }}'
-      state: present
-      backrefs: yes
-    loop: "{{ ldap_daemon_config }}"
-    when: ldap_daemon_config is defined
-    tags: ldap_init,ldap_daemon_config
-## Remove config and data DB dirs
-  - name: Delete config and data DB dirs
-    ansible.builtin.file:
-      path: "{{ item }}"
-      state: absent
-    loop:
-      - "{{ ldap_config_db_dir }}"
-      - "{{ ldap_db_directory }}"
-    tags: ldap_init,slapd_stop
-## Copy *.ldif to target host, because this files are not exist
-  - name: Copy any *.ldif to {{ ldap_config_schema_dir }} directory on target host
-    ansible.builtin.copy:
-      src: "{{ item }}"
-      dest: "{{ ldap_config_schema_dir }}/"
-    loop: "{{ lookup('ansible.builtin.fileglob', auth_files_dir + '/*.ldif', wantlist=True) }}"
-    tags: ldap_init
-## Create temp dir
-  - name: Check if /tmp/openldap/ exists on target host
-    ansible.builtin.file:
-      path: /tmp/openldap
-      state: directory
-    tags: ldap_init
-## Copy initial ldif
-  - name: Copy templates to target host
-    ansible.builtin.template:
-      src: "{{ auth_templates_dir }}/init.ldif.j2"
-      dest: /tmp/openldap/init.ldif
-    tags: ldap_init
-## Create config and data DB dirs
-  - name: Check if openldap DB dir exists
-    ansible.builtin.file:
-      path: "{{ item }}"
-      mode: "0700"
-      owner: "{{ ldap_system_user }}"
-      group: "{{ ldap_system_group }}"
-      state: directory
-    loop:
-      - "{{ ldap_db_directory }}"
-      - "{{ ldap_config_db_dir }}"
-    tags: ldap_init
-## Init ldap service
-  - name: Init ldap instance
-    become: yes
-    become_user: root
-    ansible.builtin.command: "slapadd -n 0 -F {{ ldap_config_db_dir }} -l /tmp/openldap/init.ldif"
-    tags: ldap_init
-## Clean init data after init
-  - name: Remove init.ldif
-    ansible.builtin.file:
-      path: /tmp/openldap
-      state: absent
-    tags: ldap_init
-## set owner of config dir
-  - name: Set configure directory owner and group
-    ansible.builtin.file:
-      path: "{{ ldap_config_dir }}"
-      owner: "{{ ldap_system_user }}"
-      group: "{{ ldap_system_group }}"
-      recurse: yes
-      state: directory
-    tags: ldap_init
-# Edit unit file
-  - name: Edit unit file
-    ansible.builtin.lineinfile:
-      path: "{{ slapd_service_file }}"
-      regexp: "{{ item.regexp }}"
-      line: "{{ item.line }}"
-      backrefs: yes
-      state: present
-    loop: "{{ ldap_unit_params }}"
-    tags: ldap_init
-# After edit unit file there is need to reload unit files and restart slapd
-  - name: Daemon reload after change unit
-    ansible.builtin.systemd:
-      name: slapd.service
-      daemon_reload: yes
-    when: ansible_service_mgr == 'systemd'
-    tags: ldap_init
+# == Init ldap service  == #
+# Process of init is: stop slapd if started; delete config and db dirs;
+# copy schemas *.ldif into server; create tmpdir; copy template of init.ldif to created dir
+# create config and db dirs; init ldap service by exec command slapadd
+# there is "ldap_init_force" should be defined as true for this set of tasks
+- name: Init openldap service
   when: ldap_init_force is defined and ldap_init_force | bool
+  block:
+# Stop slapd service
+    - name: Check if slapd stopped
+      ansible.builtin.service:
+        name: slapd
+        state: stopped
+      tags: ldap_init,slapd_stop
+    - name: Configure auth daemons
+      ansible.builtin.lineinfile:
+        path: "{{ item.path }}"
+        regexp: '{{ item.regexp }}'
+        line: '{{ item.line }}'
+        state: present
+        backrefs: true
+      loop: "{{ ldap_daemon_config }}"
+      when: ldap_daemon_config is defined
+      tags: ldap_init,ldap_daemon_config
+# Remove config and data DB dirs
+    - name: Delete config and data DB dirs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ ldap_config_db_dir }}"
+        - "{{ ldap_db_directory }}"
+      tags: ldap_init,slapd_stop
+# Copy *.ldif to target host, because this files are not exist
+    - name: Copy any *.ldif to ldap_config_schema_dir directory on target host
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ ldap_config_schema_dir }}/"
+        mode: "0644"
+      loop: "{{ lookup('ansible.builtin.fileglob', auth_files_dir + '/*.ldif', wantlist=True) }}"
+      tags: ldap_init
+# Create temp dir
+    - name: Check if /tmp/openldap/ exists on target host
+      ansible.builtin.file:
+        path: /tmp/openldap
+        state: directory
+        mode: "0755"
+      tags: ldap_init
+# Copy initial ldif
+    - name: Copy templates to target host
+      ansible.builtin.template:
+        src: "{{ auth_templates_dir }}/init.ldif.j2"
+        dest: /tmp/openldap/init.ldif
+        mode: "0644"
+      tags: ldap_init
+# Create config and data DB dirs
+    - name: Check if openldap DB dir exists
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: "0700"
+        owner: "{{ ldap_system_user }}"
+        group: "{{ ldap_system_group }}"
+        state: directory
+      loop:
+        - "{{ ldap_db_directory }}"
+        - "{{ ldap_config_db_dir }}"
+      tags: ldap_init
+# Init ldap service
+    - name: Init ldap instance
+      become: true
+      become_user: root
+      ansible.builtin.command: "slapadd -n 0 -F {{ ldap_config_db_dir }} -l /tmp/openldap/init.ldif"
+      changed_when: true
+      tags: ldap_init
+# Clean init data after init
+    - name: Remove init.ldif
+      ansible.builtin.file:
+        path: /tmp/openldap
+        state: absent
+      tags: ldap_init
+# set owner of config dir
+    - name: Set configure directory owner and group
+      ansible.builtin.file:
+        path: "{{ ldap_config_dir }}"
+        owner: "{{ ldap_system_user }}"
+        group: "{{ ldap_system_group }}"
+        recurse: true
+        state: directory
+      tags: ldap_init
+# Edit unit file
+    - name: Edit unit file
+      ansible.builtin.lineinfile:
+        path: "{{ slapd_service_file }}"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        backrefs: true
+        state: present
+      loop: "{{ ldap_unit_params }}"
+      tags: ldap_init
+# After edit unit file there is need to reload unit files and restart slapd
+    - name: Daemon reload after change unit
+      ansible.builtin.systemd:
+        name: slapd.service
+        daemon_reload: true
+      when: ansible_service_mgr == 'systemd'
+      tags: ldap_init
 
-## Other tasks don't need init mode (ldap_init_force)
+# Other tasks don't need init mode (ldap_init_force)
 - name: Copy schema2ldif.sh to target host
   ansible.builtin.copy:
     src: "{{ auth_files_dir }}/schema2ldif.sh"
     dest: "{{ ldap_admin_path }}/"
     owner: 'root'
     group: 'root'
-    mode: 0755
+    mode: "0755"
   tags: ldap_setup,ldap_schema_ldif
-# 
+#
 - name: Convert schema files to ldif
-  become: yes
+  become: true
   become_user: root
   ansible.builtin.command:
     chdir: "{{ ldap_config_schema_dir }}"
@@ -140,6 +144,7 @@
       - "{{ ldap_config_schema_dir }}/core.schema"
       - "{{ ldap_config_schema_dir }}/cosine.schema"
       - "{{ ldap_config_schema_dir }}/inetorgperson.schema"
+  changed_when: true
   loop: "{{ ldap_schema_only }}"
   tags: ldap_setup,ldap_schema_ldif
 # Every follow logical block need slapd is started
@@ -154,12 +159,12 @@
 # So, add this thing
 # Create dir for SSL keys/csr/cert
 - name: Check if ssl dir is exist
-  file:
+  ansible.builtin.file:
     path: "{{ ldap_ssl_dir }}"
     state: directory
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
-    mode: 0755
+    mode: "0755"
   tags: ldap_setup,ldap_ssl,ldap_ssl_cert
 # Create SSL private key
 - name: Create private key for LDAP SSL
@@ -167,7 +172,7 @@
     path: "{{ ldap_ssl_pkey }}"
     owner: "{{ ldap_system_user }}"
     group: "{{ ldap_system_group }}"
-    mode: 0600
+    mode: "0600"
   tags: ldap_setup,ldap_ssl,ldap_ssl_cert
 # Create CSR (Certificate Signing Request)
 - name: Create Certificate Signing Request for LDAP SSL
@@ -211,68 +216,77 @@
 
 # Operation of add module crashes if module is loaded yet
 - name: Load any additional modules
-  block:
-  - name: Get list of loaded modules
-    ansible.builtin.shell: |
-      ldapsearch -Y EXTERNAL -H ldapi:/// -b 'cn=module{0},cn=config' 2>/dev/null \
-      | grep olcModuleLoad \
-      | perl -MMIME::Base64 -n -00 -e 's/\n +//g;s/(?<=:: )(\S+)/decode_base64($1)/eg;print' \
-      | awk '{ gsub(/\{[0-9]+\}/,"",$2); print $2 }'
-    register: loaded_modules
-    check_mode: no
-    tags: ldap_setup,ldap_setup_add_modules,ldap_setup_overlays
-  - name: Add additional modules
-    community.general.ldap_attrs:
-      dn: cn=module{0},cn=config
-      attributes:
-        olcModuleload: "{{ item }}"
-    loop: "{{ ldap_ext_modules  }}"
-    tags: ldap_setup,ldap_setup_add_modules,ldap_setup_overlays
-    when: not item in loaded_modules.stdout
   when: ldap_ext_modules is defined
+  block:
+    - name: Get list of loaded modules
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          ldapsearch -Y EXTERNAL -H ldapi:/// -b 'cn=module{0},cn=config' 2>/dev/null \
+          | grep olcModuleLoad \
+          | perl -MMIME::Base64 -n -00 -e 's/\n +//g;s/(?<=:: )(\S+)/decode_base64($1)/eg;print' \
+          | awk '{ gsub(/\{[0-9]+\}/,"",$2); print $2 }'
+        executable: /usr/bin/bash
+      register: loaded_modules
+      check_mode: false
+      changed_when: false
+      tags: ldap_setup,ldap_setup_add_modules,ldap_setup_overlays
+    - name: Add additional modules
+      community.general.ldap_attrs:
+        dn: cn=module{0},cn=config
+        attributes:
+          olcModuleload: "{{ item }}"
+      loop: "{{ ldap_ext_modules }}"
+      tags: ldap_setup,ldap_setup_add_modules,ldap_setup_overlays
+      when: not item in loaded_modules.stdout
 
 # Operation of add schema crashes if schema is added yet
 - name: Load any additional schemas
-  block:
-  - name: Get list of loaded schemas
-    ansible.builtin.shell: |
-      ldapsearch -Y EXTERNAL -H ldapi:/// -b 'cn=schema,cn=config' 2>/dev/null \
-      | awk '/^dn:.*,cn=schema,cn=config/ { s = gensub(/dn: cn={[0-9]+}([^, ]+),cn=schema,cn=config/,"\\1","g"); print s}'
-    register: loaded_schemas
-    check_mode: no
-    tags: ldap_setup,ldap_setup_add_schemas
-  - name: Load additional schemas
-    ansible.builtin.command: "ldapadd -Q -Y EXTERNAL -H ldapi:/// -f {{ ldap_config_schema_dir }}/{{ item }}.ldif"
-    loop: "{{ ldap_ext_schemas }}"
-    when: not item in loaded_schemas.stdout
-    tags: ldap_setup,ldap_setup_add_schemas
   when: ldap_ext_schemas is defined
+  block:
+    - name: Get list of loaded schemas
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          ldapsearch -Y EXTERNAL -H ldapi:/// -b 'cn=schema,cn=config' 2>/dev/null \
+          | awk '/^dn:.*,cn=schema,cn=config/ { s = gensub(/dn: cn={[0-9]+}([^, ]+),cn=schema,cn=config/,"\\1","g"); print s}'
+        executable: /usr/bin/bash
+      register: loaded_schemas
+      check_mode: false
+      changed_when: false
+      tags: ldap_setup,ldap_setup_add_schemas
+    - name: Load additional schemas
+      ansible.builtin.command: "ldapadd -Q -Y EXTERNAL -H ldapi:/// -f {{ ldap_config_schema_dir }}/{{ item }}.ldif"
+      loop: "{{ ldap_ext_schemas }}"
+      when: not item in loaded_schemas.stdout
+      changed_when: true
+      tags: ldap_setup,ldap_setup_add_schemas
 
 # Add Organization and Organizational Units before add overlays,
 # because any overlays requare OU for it
 - name: Add base objects on primary_dc
-  block: 
-  - name: Add Organization into LDAP
-    community.general.ldap_entry:
-      dn: "{{ ldap_base_suffix }}"
-      objectClass:
-      - dcObject
-      - organization
-      attributes:
-        o: "{{ ldap_organization_name }}"
-        dc: "{{ ldap_base_name }}"
-        description: "{{ ldap_organization_desc }}"
-    tags: ldap_setup_tree,ldap_setup_o,ldap_setup_bs_ous
-  - name: Add organizational units
-    community.general.ldap_entry:
-      dn: "{{ item.dn }}"
-      objectClass: OrganizationalUnit
-      attributes:
-        ou: "{{ item.ou }}"
-        description: "{{ item.description }}"
-    loop: "{{ [ldap_default_ous,ldap_ext_ous] | community.general.lists_mergeby('ou') }}"
-    tags: ldap_setup_tree,ldap_setup_bs_ous
-#  when: common_full_hostname == common_primary_dc
+  when: common_full_hostname == common_primary_dc
+  block:
+    - name: Add Organization into LDAP
+      community.general.ldap_entry:
+        dn: "{{ ldap_base_suffix }}"
+        objectClass:
+          - dcObject
+          - organization
+        attributes:
+          o: "{{ ldap_organization_name }}"
+          dc: "{{ ldap_base_name }}"
+          description: "{{ ldap_organization_desc }}"
+      tags: ldap_setup_tree,ldap_setup_o,ldap_setup_bs_ous
+    - name: Add organizational units
+      community.general.ldap_entry:
+        dn: "{{ item.dn }}"
+        objectClass: OrganizationalUnit
+        attributes:
+          ou: "{{ item.ou }}"
+          description: "{{ item.description }}"
+      loop: "{{ [ldap_default_ous, ldap_ext_ous] | community.general.lists_mergeby('ou') }}"
+      tags: ldap_setup_tree,ldap_setup_bs_ous
 
 # MemberOf overlay should be added before adding groups but after its OU
 # so overlays are added before other objects
@@ -282,44 +296,44 @@
   when: ldap_overlays is defined
   tags: ldap_setup,ldap_setup_overlays
 
-##### Add other objects into LDAP tree #####
+# ==== Add other objects into LDAP tree ==== #
 - name: Add additional objects on primary_dc
-  block: 
-##=== BEGIN: Kerberos support ===##
-  - name: Add Kerberos
-    ansible.builtin.import_tasks: ldapkrb5.yml
-    when: auth_proto == "krb5"
-    tags: ldap_setup_tree,ldap_setup_krb
-##=== END: Kerberos support ===##
-#=====
-##=== BEGIN: sudo over ldap support ===##
-  - name: Add sudo
-    ansible.builtin.import_tasks: ldapsudo.yml
-    when: ldap_sudo is defined
-    tags: ldap_setup_tree,ldap_setup_sudo
-##=== END: sudo over ldap support ===##
-#=====
-##=== BEGIN: USERS ===##
-  - name: Add ldap users
-    ansible.builtin.import_tasks: ldapusers.yml
-    tags: ldap_setup_tree,ldap_users
-##=== END: USERS ===##
-#=====
-##=== BEGIN: GROUPS ===##
-  - name: Add groups
-    ansible.builtin.import_tasks: ldapgroups.yml
-    tags: ldap_setup_tree,ldap_groups
-##=== END: GROUPS ===##
-#=====
-##=== BEGIN: HOSTS ===##
-  - name: Add hosts
-    ansible.builtin.import_tasks: ldaphosts.yml
-    tags: ldap_setup_tree,ldap_hosts
-##=== END: HOSTS ===##
-#=====
-##=== BEGIN: SERVICES ===##
-  - name: Add services
-    ansible.builtin.import_tasks: ldapservices.yml
-    tags: ldap_setup_tree,ldap_services
-##=== END: SERVICES ===##
   when: common_full_hostname == common_primary_dc
+  block:
+# === BEGIN: Kerberos support === #
+    - name: Add Kerberos
+      ansible.builtin.import_tasks: ldapkrb5.yml
+      when: auth_proto == "krb5"
+      tags: ldap_setup_tree,ldap_setup_krb
+# === END: Kerberos support === #
+# ====
+# === BEGIN: sudo over ldap support === #
+    - name: Add sudo
+      ansible.builtin.import_tasks: ldapsudo.yml
+      when: ldap_sudo is defined
+      tags: ldap_setup_tree,ldap_setup_sudo
+# === END: sudo over ldap support === #
+# ====
+# === BEGIN: USERS === #
+    - name: Add ldap users
+      ansible.builtin.import_tasks: ldapusers.yml
+      tags: ldap_setup_tree,ldap_users
+# === END: USERS === #
+# ====
+# === BEGIN: GROUPS === #
+    - name: Add groups
+      ansible.builtin.import_tasks: ldapgroups.yml
+      tags: ldap_setup_tree,ldap_groups
+# === END: GROUPS === #
+# ====
+# === BEGIN: HOSTS === #
+    - name: Add hosts
+      ansible.builtin.import_tasks: ldaphosts.yml
+      tags: ldap_setup_tree,ldap_hosts
+# === END: HOSTS === #
+# ====
+# === BEGIN: SERVICES === #
+    - name: Add services
+      ansible.builtin.import_tasks: ldapservices.yml
+      tags: ldap_setup_tree,ldap_services
+# === END: SERVICES === #

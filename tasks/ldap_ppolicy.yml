@@ -6,7 +6,7 @@
     attributes:
       olcPasswordHash: "{{ ldap_pass_enc_func }}"
   tags: ldap_setup_ppolicy
-  
+
 - name: Set password encryption format
   community.general.ldap_attrs:
     dn: "cn=config"
@@ -29,7 +29,8 @@
 - name: Search for ppolicy overlay in ldap
   ansible.builtin.command: 'ldapsearch -LLLQ -Y EXTERNAL -H ldapi:/// -b cn=config "olcOverlay=ppolicy"'
   register: lppo_exists
-  check_mode: no
+  changed_when: false
+  check_mode: false
   tags: ldap_setup_ppolicy
 
 - name: Add entry of ppolicy overlay into LDAP
