@@ -109,8 +109,8 @@
     path: "/etc/systemd/system/systemd-logind.service.d/override.conf"
     mode: "0644"
   notify:
-    - systemd daemon-reload
-    - restart logind
+    - Systemd daemon-reload
+    - Restart logind
   tags: logind_set
 
 - name: Add sudo over ldap into /etc/nsswitch.conf

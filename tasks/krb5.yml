@@ -484,6 +484,6 @@
     - "KerberosTicketCleanup"
     - "GSSAPIAuthentication"
     - "GSSAPICleanupCredentials"
-  notify: reload sshd
+  notify: Reload sshd
   tags: krb_ssh_set
 # =====  configure SSHD to accept connections over Kerberos: END =====

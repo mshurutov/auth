@@ -7,8 +7,8 @@
     group: "root"
     mode: "0600"
   notify:
-    - enable sssd
-    - restart sssd
+    - Enable sssd
+    - Restart sssd
   tags: auth_daemon_config,sssd_daemon_config
 
 - name: Delete any modules support from /etc/pam.d/ files
