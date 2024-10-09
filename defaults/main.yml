@@ -248,7 +248,7 @@ sssd_domains_default:
       auth_provider: "krb5"
       selinux_provider: "none"
       ldap_search_base: "{{ ldap_base_suffix }}"
-      ldap_tls_cacert: "{{ common_ssl_CA }}"
+      ldap_tls_cacert: "{{ common_ssl_ca }}"
       ldap_id_use_start_tls: true
       ldap_schema: "rfc2307bis"
       krb5_realm: "{{ krb_default_realm }}"

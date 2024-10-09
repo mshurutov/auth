@@ -8,16 +8,16 @@
 # get DIT into variable. There is on {{ common_primary_dc }}
 - name: Get LDAP DIT from common_primary_dc
   ansible.builtin.command: slapcat
-  register: ldap_DIT
+  register: ldap_dit
   changed_when: false
   check_mode: false
   tags: ldap_setup_syncprov
   when: common_full_hostname == common_primary_dc
 
-- name: Copy ldap_DIT to controller as file
+- name: Copy ldap_dit to controller as file
   ansible.builtin.copy:
     dest: "/tmp/DIT_data.ldif"
-    content: "{{ ldap_DIT.stdout }}"
+    content: "{{ ldap_dit.stdout }}"
     mode: "0644"
   tags: ldap_setup_syncprov
   when: common_full_hostname == common_primary_dc
@@ -116,10 +116,10 @@
       - "olcSyncProvConfig"
     attributes:
       olcOverlay: "syncprov"
-      olcSpCheckPoint: "{{ lspo.attrs.olcSpCheckPoint }}"
-      olcSpNoPresent: "{{ lspo.attrs.olcSpNoPresent | default(omit) }}"
-      olcSpReloadHint: "{{ lspo.attrs.olcSpReloadHint | default(omit) }}"
-      olcSpSessionlog: "{{ lspo.attrs.olcSpSessionlog | default(omit) }}"
+      olcSpCheckPoint: "{{ lspo.attrs.olcspcheckpoint }}"
+      olcSpNoPresent: "{{ lspo.attrs.olcspnopresent | default(omit) }}"
+      olcSpReloadHint: "{{ lspo.attrs.olcspreloadhint | default(omit) }}"
+      olcSpSessionlog: "{{ lspo.attrs.olcspsessionlog | default(omit) }}"
   tags: ldap_setup_syncprov,ldap_config_syncprov
   when: syncprov_exists.stdout == "NO"
 
@@ -127,7 +127,7 @@
   community.general.ldap_attrs:
     dn: "cn=config"
     attributes:
-      olcServerID: "{{ ldap_ServerID }}"
+      olcServerID: "{{ ldap_serverid }}"
   tags: ldap_setup_syncprov,ldap_config_syncprov
 
 - name: Get OlcSyncRepls
@@ -165,7 +165,7 @@
     dn: "{{ ldap_db_dn }}"
     attributes:
       olcSyncrepl: >
-        rid=00{{ prov.ServerID }}
+        rid=00{{ prov.serverid }}
         provider={{ prov.ldap_uri }}
         type=refreshAndPersist
         retry="{{ ldap_sync_retry }}"
