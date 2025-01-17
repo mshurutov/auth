@@ -1,0 +1,15 @@
+---
+- name: FreeIPA
+  tags: auth_services,freeipa_services
+  community.general.ipa_service:
+    force: "{{ item.force | default(omit) }}"
+    hosts: "{{ item.hosts | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+# krbcanonicalname is required and must be unique identifier.
+    krbcanonicalname: "{{ item.krbcanonicalname }}"
+    skip_host_check: "{{ item.skip_host_check | default(omit) }}"
+    state: "{{ item.state | default(omit) }}"
+  loop: "{{ freeipa_services }}"

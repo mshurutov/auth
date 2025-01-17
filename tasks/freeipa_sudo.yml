@@ -1,0 +1,57 @@
+---
+- name: FreeIPA
+  tags: auth_sudo,freeipa_sudo,freeipa_sudocmd
+  community.general.ipa_sudocmd:
+    description: "{{ item.description | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    state: "{{ item.state | default(omit) }}"
+# sudocmd is required
+    sudocmd: "{{ item.sudocmd }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_sudocmd }}"
+
+- name: FreeIPA
+  tags: auth_sudo,freeipa_sudo,freeipa_sudocmdgroup
+  community.general.ipa_sudocmdgroup:
+# CN is required and must be the unique identifier.
+    cn: "{{ item.cn }}"
+    description: "{{ item.description | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    state: "{{ item.state | default(omit) }}"
+    sudocmd: "{{ item.sudocmd | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_sudocmdgroup }}"
+
+- name: FreeIPA
+  tags: auth_sudo,freeipa_sudo,freeipa_sudorule
+  community.general.ipa_sudorule:
+    cmd: "{{ item.cmd | default(omit) }}"
+    cmdcategory: "{{ item.cmdcategory | default(omit) }}"
+    cmdgroup: "{{ item.cmdgroup | default(omit) }}"
+# CN is required and must be the unique identifier.
+    cn: "{{ item.cn }}"
+    deny_cmd: "{{ item.deny_cmd | default(omit) }}"
+    deny_cmdgroup: "{{ item.deny_cmd | default(omit) }}"
+    description: "{{ item.description | default(omit) }}"
+    host: "{{ item.host | default(omit) }}"
+    hostcategory: "{{ item.hostcategory | default(omit) }}"
+    hostgroup: "{{ item.hostgroup | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    runasextusers: "{{ item.runasextusers | default(omit) }}"
+    runasgroupcategory: "{{ item.runasgroupcategory | default(omit) }}"
+    runasusercategory: "{{ item.runasusercategory | default(omit) }}"
+    state: "{{ item.state | default(omit) }}"
+    sudoopt: "{{ item.sudoopt | default(omit) }}"
+    user: "{{ item.user | default(omit) }}"
+    usercategory: "{{ item.usercategory | default(omit) }}"
+    usergroup: "{{ item.usergroup | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_sudorule }}"

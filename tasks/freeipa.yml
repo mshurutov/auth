@@ -1,0 +1,98 @@
+---
+
+- name: Init of FreeIPA on master host
+  become: true
+  become_user: "root"
+  when: freeipa_init_force is defined and freeipa_init_force | bool
+  tags: auth_init,freeipa_init
+  block: 
+    - name: Init primary DC
+      when: common_full_hostname == common_primary_dc and
+      block:
+        - name: Copy template of script to target host
+          ansible.builtin.template:
+            src: "{{ auth_templates_dir }}/freeipa_init.sh.j2"
+            dest: "/tmp/freeipa_init.sh"
+            owner: "root"
+            mode: "0750"
+        - name: Execute init script
+          ansible.builtin.command: /tmp/freeipa_init.sh
+          changed_when: true
+          register: freeipa_init_result
+        - name: Delete script
+          ansible.builtin.file:
+            path: "/tmp/freeipa_init.sh"
+            state: absent
+
+- name: Configure FreeIPA server
+  tags: auth_config,freeipa_config
+  community.general.ipa_config:
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    ipaconfigstring: "{{ ipaconfigstring | default(omit) }}"
+    ipadefaultemaildomain: "{{ ipadefaultemaildomain | default(common_domain_name) }}"
+    ipadefaultloginshell: "{{ ipadefaultloginshell | default(ldap_loginshell) }}"
+    ipadefaultprimarygroup: "{{ ipadefaultprimarygroup | default('users') }}"
+    ipagroupobjectclasses: "{{ ipagroupobjectclasses | default(omit) }}"
+    ipagroupsearchfields: "{{ ipagroupsearchfields | default(omit) }}"
+    ipahomesrootdir: "{{ ipahomesrootdir | default('/home') }}"
+    ipakrbauthzdata: "{{ ipakrbauthzdata | default(omit) }}"
+    ipamaxusernamelength: "{{ ipamaxusernamelength | default(omit) }}"
+    ipapwdexpadvnotify: "{{ ipapwdexpadvnotify | default(omit) }}"
+    ipasearchrecordslimit: "{{ ipasearchrecordslimit | default(omit) }}"
+    ipasearchtimelimit: "{{ ipasearchtimelimit | default(omit) }}"
+    ipaselinuxusermaporder: "{{ ipaselinuxusermaporder | default(omit) }}"
+    ipauserauthtype: "{{ ipauserauthtype | default(omit) }}"
+    ipauserobjectclasses: "{{ ipauserobjectclasses | default(omit) }}"
+    ipausersearchfields: "{{ ipausersearchfields | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+
+# Manage FreeIPA users and groups
+- name: FreeIPA users and groups
+  ansible.builtin.import_tasks: freeipa_ug.yml
+
+# Manage FreeIPA DNS settings: records and zones
+- name: FreeIPA DNS
+  ansible.builtin.import_tasks: freeipa_dns.yml
+
+# Manage FreeIPA keytab file
+- name: FreeIPA keytab
+  ansible.builtin.import_tasks: freeipa_keytab.yml
+
+# Manage FreeIPA HBAC rules
+- name: FreeIPA HBAC rules
+  ansible.builtin.import_tasks: freeipa_hbac.yml
+
+# Manage FreeIPA hosts and hosts groups
+- name: FreeIPA hosts and hosts groups
+  ansible.builtin.import_tasks: freeipa_hosts.yml
+
+# Manage FreeIPA OTP
+- name: FreeIPA OTP
+  ansible.builtin.import_tasks: freeipa_otp.yml
+
+# Manage FreeIPA password policy
+- name: FreeIPA password policy
+  ansible.builtin.import_tasks: freeipa_pwdpolicy.yml
+
+# Manage FreeIPA roles
+- name: FreeIPA roles
+  ansible.builtin.import_tasks: freeipa_roles.yml
+
+# Manage FreeIPA services
+- name: FreeIPA services
+  ansible.builtin.import_tasks: freeipa_services.yml
+
+# Manage FreeIPA SubCA
+- name: FreeIPA SubCA
+  ansible.builtin.import_tasks: freeipa_subca.yml
+
+# Manage FreeIPA sudo
+- name: FreeIPA sudo
+  ansible.builtin.import_tasks: freeipa_sudo.yml
+
+# Manage FreeIPA vault
+- name: FreeIPA vault
+  ansible.builtin.import_tasks: freeipa_vault.yml

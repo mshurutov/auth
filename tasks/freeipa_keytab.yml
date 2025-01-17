@@ -1,0 +1,20 @@
+---
+- name: FreeIPA keytab for host/service
+  tags: freeipa_keytab
+  community.general.ipa_getkeytab:
+    bind_dn: "{{ auth_admin_init | default(omit) }}"
+    bind_pw: "{{ auth_admin_init_pwd | default(omit) }}"
+    ca_cert: "{{ auth_ssl_ca_cert | default() }}"
+    encryption_types: "{{ item.encryption_types | default(omit) }}"
+    force: "{{ item.force | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ldap_uri: "{{ item.ldap_uri | default(omit) }}"
+    password: "{{ item.password | default(omit) }}"
+# path is required
+    path: "{{ item.path }}"
+# principal is required
+    principal: "{{ item.principal }}"
+    retrieve_mode: "{{ item.retrieve_mode | default(omit) }}"
+    sasl_mech: "{{ item.sasl_mech | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ freeipa_keytab }}"

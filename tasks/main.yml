@@ -1,78 +1,170 @@
 ---
 - name: Check if ansible version is equal or greater than 2.11
+  when: ansible_version.full is ansible.builtin.version('2.11','<')
   ansible.builtin.fail:
     msg: "Ansible core should be equal or greater than 2.11"
-  when: ansible_version.full is ansible.builtin.version('2.11','<')
 
 - name: Check if python is equal or greater than 3
+  when: ansible_python.version.major is ansible.builtin.version('3','<')
   ansible.builtin.fail:
     msg: "Python should be equal or greater than 3"
-  when: ansible_python.version.major is ansible.builtin.version('3','<')
 
 - name: Set distro independed variables
+  tags: auth_set_vars,auth_install
   ansible.builtin.include_vars:
     file: "{{ auth_vars_dir }}/main.yml"
-  tags: auth_set_vars,auth_install
 
 - name: Set distro depended variables
+  tags: auth_set_vars,auth_install
   ansible.builtin.include_vars:
     file: "{{ auth_vars_dir }}/{{ ansible_pkg_mgr }}.yml"
-  tags: auth_set_vars,auth_install
 
 - name: Install auth services
-  ansible.builtin.package:
-    name: "{{ auth_packages }}"
-    state: present
   tags: auth_install
+  block:
+    - name: Install packages on normal Linux distros
+      when: ansible_pkg_mgr != "apt_rpm"
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: "present"
+      loop: "{{ auth_packages }}"
+    - name: Install packages on normal Linux distros
+      when: ansible_pkg_mgr == "apt_rpm"
+      community.general.apt_rpm:
+        package: "{{ item }}"
+        state: "present_not_latest"
+      loop: "{{ auth_packages }}"
 
-- name: Check if local CA is exist on target host
-  ansible.builtin.stat:
-    path: "{{ common_ssl_CA }}"
-  register: stat_ssl_ca
+- name: Setup selsigned CA
+  when: auth_db != "freeipa" and common_selfsigned_ca_enable is defined and common_selfsigned_ca_enable | bool
   tags: auth_ssl_ca
+  block:
+    - name: Create selfsigned SSL CA
+      when: common_full_hostname == common_primary_dc
+      tags: auth_ssl_ca_create
+      block:
+        - name: Check if CA private key dir exists
+          ansible.builtin.file:
+            path: "{{ auth_ssl_private_keys_dir }}"
+            state: directory
+            mode: "0700"
+        - name: Check if CA dir exists
+          ansible.builtin.file:
+            path: "{{ auth_ssl_certs_dir }}"
+            state: directory
+            mode: "0755"
+        - name: Create CA private key
+          community.crypto.openssl_privatekey:
+            path: "{{ auth_ssl_ca_pkey }}"
+            owner: 'root'
+            group: 'root'
+            mode: "0600"
+            return_content: true
+          register: ssl_ca_pk_var
+        - name: Create CA Certificate Signing Request
+          community.crypto.openssl_csr:
+            path: "{{ auth_ssl_ca_csr }}"
+            privatekey_path: "{{ auth_ssl_ca_pkey }}"
+            basic_constraints:
+              - 'CA:TRUE'
+            basic_constraints_critical: true
+            country_name: "{{ common_country_name }}"
+            locality_name: "{{ auth_ssl_locality_name | default(omit) }}"
+            common_name: "{{ auth_ssl_common_name }}"
+            email_address: "{{ auth_ssl_owner_email_address }}"
+            organization_name: "{{ ldap_organization_name | default(omit) }}"
+            organizational_unit_name: "{{ auth_ssl_organizational_unit_name | default(omit) }}"
+            subject_alt_name: "{{ auth_ssl_subject_alt_name | default(omit) }}"
+        - name: Create selfsigned Certificate
+          community.crypto.x509_certificate:
+            path: "{{ auth_ssl_ca_cert }}"
+            privatekey_path: "{{ auth_ssl_ca_pkey }}"
+            csr_path: "{{ auth_ssl_ca_csr }}"
+            provider: selfsigned
+            return_content: true
+          register: ssl_ca_var
+        - name: Generate new DB of CA if needed
+          ansible.builtin.command: "{{ auth_ssl_ca_generate_cmd }}"
+          changed_when: true
+          when: auth_ssl_ca_generate_cmd and auth_ssl_ca_generate_cmd | length > 0
+        - name: Copy SSL CA to accessible place
+          ansible.builtin.copy:
+            dest: "{{ common_local_store }}/{{ common_domain_name }}-ssl-ca.pem"
+            content: "{{ ssl_ca_var.certificate }}"
+            mode: "0644"
+          delegate_to: 127.0.0.1
+        - name: Copy SSL CA private key to accessible place
+          ansible.builtin.copy:
+            dest: "{{ common_local_store }}/{{ common_domain_name }}-private.pem"
+            content: "{{ ssl_ca_pk_var.privatekey }}"
+            mode: "0644"
+          delegate_to: 127.0.0.1
+    - name: Copy selfsigned SSL CA and PK to other hosts
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode }}"
+        owner: root
+        group: root
+      loop:
+        - src: "{{ common_local_store }}/{{ common_domain_name }}-ssl-ca.pem"
+          dest: "{{ auth_ssl_ca_cert }}"
+          mode: "0644"
+        - src: "{{ common_local_store }}/{{ common_domain_name }}-private.pem"
+          dest: "{{ auth_ssl_ca_pkey }}"
+          mode: "0600"
+      notify: Upload ca
+      when: common_full_hostname != common_primary_dc
 
-- name: Copy root CA to target host
-  ansible.builtin.copy:
-    src: "{{ common_local_store }}/{{ common_domain_name }}-ssl-ca.pem"
-    dest: "{{ common_ssl_CA }}"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  when: ! stat_ssl_ca.stat.exists
-  tags: auth_ssl_ca
-
+# ##### Configure central AUTH system #####                                  
+# ### Install and configure Auth server (openLDAP or FreeIPA) ###
 - name: Setup authdb server (default OpenLDAP)
-  ansible.builtin.include_tasks: "{{ auth_db }}.yml"
   when: ldap_servers_group in group_names
-  tags: auth_db_setup
+  tags: auth_server_setup
+  block:
+# Install and configure OpenLDAP+Kerberos auth system
+    - name: Setup OpenLDAP 
+      when: auth_db == "openldap"
+      tags: ldap_setup
+      ansible.builtin.import_tasks: "openldap.yml"
+# Install and configure FreeIPA auth system
+    - name: Setup FreeIPA
+      when: auth_db == "freeipa"
+      tags: freeipa_setup
+      ansible.builtin.import_tasks: "freeipa.yml"
+# Configure auth protocol
+    - name: Configure auth protocol if auth_proto is not ldap (default krb5)
+      tags: auth_proto_setup
+      block:
+        - name: Configure Kerberos
+          tags: krb5_setup
+          when: auth_proto == "krb5" and auth_db != "freeipa"
+          ansible.builtin.import_tasks: "krb5.yml"
 
-- name: Edit ldap.conf (system config)
-  ansible.builtin.lineinfile:
-    path: "{{ ldap_config_dir }}/ldap.conf"
-    regexp: "^[\t ]*#?[\t ]*{{ item.key }}.*"
-    line: "{{ item.key }} {{ item.value }}"
-    state: present
-    create: true
-    mode: "0644"
-  loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
+# ##### Configure auth clients #####
+# ### LDAP conf ###
+- name: LDAP clients configure
   tags: ldap_client_config
-
-- name: Edit /etc/ldap.conf (any services and users config)
-  ansible.builtin.lineinfile:
-    path: "/etc/ldap.conf"
-    line: "{{ item.key }} {{ item.value }}"
-    state: present
-    owner: 'root'
-    group: 'root'
-    mode: '0600'
-    create: true
-  loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
-  tags: ldap_client_config
-
-- name: Configure auth protocol if auth_proto is not ldap (default krb5)
-  ansible.builtin.include_tasks: "{{ auth_proto }}.yml"
-  when: auth_proto != "ldap" and auth_proto != "freeipa"
-  tags: auth_proto_setup
+  block:
+    - name: Edit ldap.conf (system config)
+      ansible.builtin.lineinfile:
+        path: "{{ ldap_config_dir }}/ldap.conf"
+        regexp: "^[\t ]*#?[\t ]*{{ item.key }}.*"
+        line: "{{ item.key }} {{ item.value }}"
+        state: present
+        create: true
+        mode: "0640"
+      loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
+    - name: Edit /etc/ldap.conf (any services and users config)
+      ansible.builtin.lineinfile:
+        path: "/etc/ldap.conf"
+        line: "{{ item.key }} {{ item.value }}"
+        state: present
+        owner: 'root'
+        group: 'root'
+        mode: '0640'
+        create: true
+      loop: "{{ lookup('ansible.builtin.dict', ldap_conf_params, wantlist=True) }}"
 
 - name: Configure auth service if auth_daemon is not ldap (default sssd)
   ansible.builtin.include_tasks: "{{ auth_daemon }}.yml"

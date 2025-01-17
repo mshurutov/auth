@@ -1,0 +1,52 @@
+---
+- name: FreeIPA groups
+  tags: auth_groups,freeipa_groups
+  community.general.ipa_:
+    append: "{{ item.append | default(omit) }}"
+# CN is required and must be the unique identifier.
+    cn: "{{ item.cn }}"
+    description: "{{ item.description | default(omit) }}"
+    external: "{{ item.external | default(omit) }}"
+    external_user: "{{ item.external_user | default(omit) }}"
+# gidnumber is required for POSIX group
+    gidnumber: "{{ item.gidnumber | default(omit) }}"
+    group: "{{ item.group | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    nonposix: "{{ item.nonposix | default('false') }}"
+    state: "{{ item.state | default('present') }}"
+    user: "{{ item.user | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_groups }}"
+
+- name: FreeIPA users
+  tags: auth_users,freeipa_users
+  community.general.ipa_user:
+    displayname: "{{ item.displayname | default(omit) }}"
+# gidnumber is required for POSIX group
+    gidnumber: "{{ item.gidnumber }}"
+    givenname: "{{ item.givenname | default(omit) }}"
+    homedirectory: "{{ item.homedirectory | default(ldap_home_root + '/' + item.uid) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    krbpasswordexpiration: "{{ item.krbpasswordexpiration | default(omit) }}"
+    loginshell: "{{ item.loginshell | default(ldap_loginshell) }}"
+    mail: "{{ item.mail | default(item.uid + '@' + common_domain_name) }}"
+    password: "{{ item.password | default(omit) }}"
+    sn: "{{ item.sn | default(omit) }}"
+    sshpubkey: "{{ item.sshpubkey | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    telephonenumber: "{{ item.telephonenumber | default(omit) }}"
+    title: "{{ item.title | default(omit) }}"
+# UID is required and must be the unique identifier.
+    uid: "{{ item.uid }}"
+# uidnumber is required for POSIX account
+    uidnumber: "{{ item.uidnumber }}"
+    update_password: "{{ item.update_password | default('always') }}"
+    userauthtype: "{{ item.userauthtype | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_users }}"

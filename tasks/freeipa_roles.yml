@@ -1,0 +1,19 @@
+---
+- name: FreeIPA roles
+  tags: freeipa_roles
+  community.general.ipa_role:
+# CN is required and must be unique identifier.
+    cn: "{{ item.cn }}"
+    description: "{{ item.description }}"
+    group: "{{ item.group }}"
+    host: "{{ item.host }}"
+    hostgroup: "{{ item.hostgroup }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    privilege: "{{ item.privilege }}"
+    service: "{{ item.service }}"
+    state: "{{ item.state }}"
+    user: "{{ item.user }}"
+  loop: "{{ freeipa_roles }}"

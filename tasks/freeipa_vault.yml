@@ -1,0 +1,20 @@
+---
+- name: FreeIPA vault
+  tags: freeipa_vault
+  community.general.ipa_vault:
+# CN must be defined and it is the unique identifier.
+    cn: "{{ item.cn }}"
+    description: "{{ item.description | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    ipavaultpublickey: "{{ item.ipavaultpublickey | default(omit) }}"
+    ipavaultsalt: "{{ item.ipavaultsalt | default(omit) }}"
+    ipavaulttype: "{{ item.ipavaulttype | default(omit) }}"
+    replace: "{{ item.replace | default(omit) }}"
+    service: "{{ item.service | default(omit) }}"
+    state: "{{ item.state | default(omit) }}"
+    username: "{{ item.username | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_vault }}"

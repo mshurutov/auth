@@ -1,0 +1,41 @@
+---
+- name: FreeIPA hosts manage
+  tags: freeipa_hosts
+  community.general.ipa_host:
+    description: "{{ item.description | default(omit) }}"
+    force: "{{ item.force | default(omit) }}"
+    force_creation: "{{ item.force | default(omit) }}"
+# FQDN is required and must be unique identifier.
+    fqdn: "{{ item.fqdn }}"
+    ip_address: "{{ item.ip | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    mac_address: "{{ item.mac | default(omit) }}"
+    ns_hardware_platform: "{{ item.ns_hardware_platform | default(omit) }}"
+    ns_host_location: "{{ item.ns_host_location | default(omit) }}"
+    ns_os_version: "{{ item.ns_os_version | default(omit) }}"
+    random_password: "{{ item.random | default(omit) }}"
+    state: "{{ item.state | default(omit) }}"
+    update_dns: "{{ item.update | default(omit) }}"
+    user_certificate: "{{ item.user | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_hosts }}"
+
+- name: FreeIPA hostgroup
+  tags: freeipa_hostgroup
+  community.general.ipa_hostgroup:
+    append: "{{ item.append | default(omit) }}"
+# CN is required and must be unique identifier.
+    cn: "{{ item.cn }}"
+    description: "{{ item.description | default(omit) }}"
+    host: "{{ item.host | default(omit) }}"
+    hostgroup: "{{ item.hostgroup | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    state: "{{ item.state | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_hostgroup }}"

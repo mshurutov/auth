@@ -1,7 +1,7 @@
 ---
 # Common parameters for all tasks in role
 auth_db: "openldap" # default is OpenLDAP, may be any others LDAP servers, ex. FreeIPA
-auth_proto: "krb5" # authentication protocol, may be ldap or FreeIPA
+auth_proto: "krb5" # authentication protocol, may be ldap
 auth_daemon: "sssd" # authentication daemon, may be ?
 # Directories for store templates,files and vars
 auth_templates_dir: "{{ role_path }}/templates"
@@ -41,6 +41,20 @@ auth_disable_modules:
   - ".*pam_krb5.*"
   - ".*pam_sss.*"
   - ".*pam_systemd.*"
+# Common auth variables
+# auth certs variables. Commented variables is not necessary.
+auth_validate_certs: true
+auth_ssl_private_keys_dir:
+auth_ssl_certs_dir:
+auth_ssl_ca_pkey:
+auth_ssl_ca_csr:
+# auth_ssl_locality_name:
+auth_ssl_common_name:
+auth_ssl_owner_email_address:
+# auth_ssl_organizational_unit_name:
+# auth_ssl_subject_alt_name:
+auth_ssl_ca_cert:
+# auth_ssl_ca_generate_cmd:
 # System settings for ldap part: files and dirs, system users and groups, connection info etc
 ldap_version: "2.6"
 # Files and directories. May be distribution-depended, so there is should be specified.
@@ -264,3 +278,98 @@ sss_pam_settings:
   - { regexp: "^password.*pam_unix.so.*", line: "password\tsufficient\tpam_sss.so use_authtok" }
   - { regexp: "^session.*pam_unix.so.*", line: "session\t\tsufficient\tpam_sss.so" }
   - { regexp: "^session.*pam_sss.so.*", line: "session\t\toptional\tpam_systemd.so" }
+
+# FreeIPA variables are defined there
+# Config variables are commented
+# FreeIPA Groups
+freeipa_groups: []
+# CN is required and must be the unique identifier.
+#  - cn: "ops"
+#    description: "Group for operations"
+# gidnumber is required for POSIX group
+#    gidnumber: "10000"
+# CN is required and must be the unique identifier.
+#  - cn: "users"
+#    description: "Group for all users"
+# gidnumber is required for POSIX group
+#    gidnumber: "10001"
+# FreeIPA
+freeipa_hbacrule: []
+# CN is required and must be the unique identifier.
+#  - cn: mainrule
+#    description: Allow admins to access any hosts from any hosts
+#    hostcategory: all
+#    servicecategory: all
+#    usergroup:
+#      - "wheel"
+# FreeIPA
+freeipa_hosts: []
+# FreeIPA
+# FQDN is required and must be unique identifier.
+#  - fqdn: "{{ item.fqdn }}"
+# FreeIPA
+freeipa_hostgroup: []
+# CN is required and must be unique identifier.
+#  - cn: "{{ item.cn }}"
+# FreeIPA keytabs
+freeipa_keytab: []
+# FreeIPA
+freeipa_otpconfig: []
+freeipa_otptoken: []
+# Unique ID of the token in IPA.
+#  - uniqueid: "MainToken"
+# FreeIPA
+freeipa_pwpolicy: []
+# FreeIPA
+freeipa_roles: []
+# CN is required and must be unique identifier.
+#  - cn: "pgdba"
+#    description: "Postgres Database Administrators"
+#    user:
+#    - "pgdba01"
+#    - "pgdba02"
+# FreeIPA
+freeipa_services: []
+# krbcanonicalname is required and must be the unique identifier.
+#  - krbcanonicalname: "ldap/{{ common_full_hostname }}"
+# FreeIPA
+freeipa_subca: []
+# subca_name is required
+#  - subca_name: "AnsibleSubCA1"
+# subca_subject is required
+#  - subca_subject: "CN=AnsibleSubCA1,O=example.com"
+# FreeIPA
+freeipa_sudocmd: []
+# sudocmd is required
+#  - sudocmd: "su"
+# FreeIPA
+freeipa_sudocmdgroup: []
+# CN is required and must be the unique identifier.
+#  - cn: "postgres_manage"
+#    sudocmd:
+#    - "systemctl start {{ postgres_service_name }}"
+#    - "systemctl stop {{ postgres_service_name }}"
+#    - "systemctl restart {{ postgres_service_name }}"
+#    - "systemctl reload {{ postgres_service_name }}"
+# FreeIPA
+freeipa_sudorule: []
+# CN is required and must be the unique identifier.
+#  - cn: "sudo4wheel"
+#    description: "Allow members of wheel to run any commands without password"
+#    cmdcategory: all
+#    sudoopt:
+#    - "!authenticate"
+#    usergroup:
+#    - "wheel"
+# FreeIPA
+freeipa_users: []
+# UID is required and must be the unique identifier.
+#  - uid: "admin"
+# gidnumber is required for POSIX group
+#    gidnumber: "10000"
+# uidnumber is required for POSIX account
+#    uidnumber: "10000"
+# FreeIPA
+freeipa_vault: []
+# CN is required and must be the unique identifier.
+#  - cn: "ipa_vault_general"

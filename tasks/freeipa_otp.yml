@@ -1,0 +1,42 @@
+---
+- name: FreeIPA OTP config
+  tags: freeipa_otp,freeipa_otpconfig
+  community.general.ipa_otpconfig:
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    ipatokenhotpauthwindow: "{{ item.ipatokenhotpauthwindow | default(omit) }}"
+    ipatokenhotpsyncwindow: "{{ item.ipatokenhotpsyncwindow | default(omit) }}"
+    ipatokentotpauthwindow: "{{ item.ipatokentotpauthwindow | default(omit) }}"
+    ipatokentotpsyncwindow: "{{ item.ipatokentotpsyncwindow | default(omit) }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_otpconfig }}"
+
+- name: FreeIPA OTP token
+  tags: freeipa_otp,freeipa_otptoken
+  community.general.ipa_otptoken:
+    algorithm: "{{ item.algorithm | default(omit) }}"
+    counter: "{{ item.counter | default(omit) }}"
+    description: "{{ item.description | default(omit) }}"
+    digits: "{{ item.digits | default(omit) }}"
+    enabled: "{{ item.enabled | default(omit) }}"
+    interval: "{{ item.interval | default(omit) }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    model: "{{ item.model | default(omit) }}"
+    newuniqueid: "{{ item.newuniqueid | default(omit) }}"
+    notafter: "{{ item.notafter | default(omit) }}"
+    notbefore: "{{ item.notbefore | default(omit) }}"
+    offset: "{{ item.offset | default(omit) }}"
+    otptype: "{{ item.otptype | default(omit) }}"
+    owner: "{{ item.owner | default(omit) }}"
+    secretkey: "{{ item.secretkey | default(omit) }}"
+    serial: "{{ item.serial | default(omit) }}"
+    state: "{{ item.state | default(omit) }}"
+# Unique ID of the token in IPA.
+    uniqueid: "{{ item.uniqueid }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_otptoken }}"

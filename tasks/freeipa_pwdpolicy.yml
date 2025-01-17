@@ -1,0 +1,25 @@
+---
+- name: FreeIPA password poplicy manage
+  tags: freeipa_pwpolicy
+  community.general.ipa_pwpolicy:
+    dictcheck: "{{ item.dictcheck }}"
+    failinterval: "{{ item.failinterval }}"
+    gracelimit: "{{ item.gracelimit }}"
+    group: "{{ item.group }}"
+    historylength: "{{ item.historylength }}"
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    lockouttime: "{{ item.lockouttime }}"
+    maxfailcount: "{{ item.maxfailcount }}"
+    maxpwdlife: "{{ item.maxpwdlife }}"
+    maxrepeat: "{{ item.maxrepeat }}"
+    maxsequence: "{{ item.maxsequence }}"
+    minclasses: "{{ item.minclasses }}"
+    minlength: "{{ item.minlength }}"
+    minpwdlife: "{{ item.minpwdlife }}"
+    priority: "{{ item.priority }}"
+    state: "{{ item.state }}"
+    usercheck: "{{ item.usercheck }}"
+  loop: "{{ freeipa_pwpolicy }}"

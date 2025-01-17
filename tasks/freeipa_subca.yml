@@ -1,0 +1,16 @@
+---
+- name: FreeIPA
+  tags: freeipa_subca
+  community.general.ipa_subca:
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    state: "{{ item.state | default(omit) }}"
+    subca_desc: "{{ item.subca_desc | default(omit) }}"
+# subca_name is required
+    subca_name: "{{ item.subca_name }}"
+# subca_subject is required
+    subca_subject: "{{ item.subca_subject }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_subca }}"

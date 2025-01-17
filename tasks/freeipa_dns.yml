@@ -1,0 +1,20 @@
+---
+- name: FreeIPA DNS records settings
+  tags: freeipa_
+  community.general.ipa_:
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_dns_zones | subelements() }}"
+
+- name: FreeIPA DNS zones settings
+  tags: freeipa_
+  community.general.ipa_:
+    ipa_host: "{{ common_primary_dc }}"
+    ipa_port: 443
+    ipa_prot: "https"
+    ipa_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+    validate_certs: "{{ item.validate_certs | default(auth_validate_certs) }}"
+  loop: "{{ freeipa_dns_zones }}"
